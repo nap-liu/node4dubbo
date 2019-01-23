@@ -8,6 +8,7 @@ import {connectOption} from 'node-zookeeper-client'
 import {UrlWithParsedQuery} from "url";
 import Socket from '../src/socket';
 import java = require('js-to-java');
+import {EventEmitter} from 'events'
 
 /**
  * 该参数会透传给 node-zookeeper-client 模块
@@ -102,4 +103,22 @@ export interface InvokePackage {
     method: string;
     args: any[];
     service: service;
+}
+
+type proxyFunction = (...args: any[]) => Promise<any>
+
+export class DubboClient extends EventEmitter {
+    /**
+     * 代理服务方法
+     */
+    [x: string]: {
+        [x: string]: proxyFunction;
+    } | any;
+
+    /**
+     * 客户端已连接
+     * @param {string} serviceName
+     * @returns {Promise<DubboClient>}
+     */
+    ready(serviceName: string): Promise<DubboClient>;
 }
