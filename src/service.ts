@@ -17,11 +17,13 @@ class Service {
     _providers: Provider[];
     _parent: DubboClient;
     _name: string;
+    _tasks: Function[];
 
     constructor(serviceName: string, service: service, providers: UrlWithParsedQuery[], dubbo: DubboClient) {
         this._parent = dubbo;
         this._service = service;
         this._name = serviceName;
+        this._tasks = [];
 
         this._providers = providers.reduce((pool: Provider[], current: Provider) => {
             let currentPool: number = service.pool;
@@ -35,13 +37,13 @@ class Service {
             return provider;
         });
         debug('创建dubbo线程池', this._providers.length);
-        debug('注入实例方法');
+        debug('注入实例方法', this._service.interface);
         this._injectInvokeProxy();
         process.nextTick(this._ready.bind(this));
     }
 
     _ready() {
-        debug('服务初始化完成');
+        debug('服务初始化完成', this._service.interface);
         this._emit('dubbo-ready', this._parent, this._service);
         if (this._parent && this._parent._ready && this._parent._ready[this._name]) {
             const ready = this._parent._ready[this._name];
@@ -101,10 +103,11 @@ class Service {
                 })
             }
             return new Promise(async (resolve, reject) => {
-                const provider = await this._getProvider();
-                const invoker = {resolve, reject, method, args, service: _service};
-                provider.socket.invoke(invoker);
-                setTimeout(reject, +provider.query['default.timeout'] || 1000 * 5, new Error(`${_service.interface}.${method} 调用超时`))
+                this._getProvider((provider: Provider) => {
+                    const invoker = {resolve, reject, method, args, service: _service};
+                    provider.socket.invoke(invoker);
+                    setTimeout(reject, +provider.query['default.timeout'] || 1000 * 5, new Error(`${_service.interface}.${method} 调用超时`))
+                });
             })
         }
     }
@@ -114,18 +117,24 @@ class Service {
      * @returns {Promise<Provider>}
      * @private
      */
-    _getProvider(): Promise<Provider> {
-        return new Promise(resolve => {
-            const timer = setInterval(() => {
-                const provider = this._providers.find((provider: Provider) => {
-                    return provider.socket.isBusy === false
-                });
-                if (provider) {
-                    clearInterval(timer);
-                    resolve(provider);
-                }
-            }, 0);
-        })
+    _getProvider(callback: Function) {
+        const provider = this._providers.find(item => item.socket.isBusy === false);
+        if (provider) {
+            callback(provider);
+        } else {
+            this._tasks.push(callback);
+        }
+    }
+
+    /**
+     * 从任务缓冲区中取回等待执行的任务
+     * @private
+     */
+    _nextTask(provider: Provider) {
+        if (this._tasks.length) {
+            const callback: Function = this._tasks.shift();
+            callback(provider);
+        }
     }
 
     /**

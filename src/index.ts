@@ -54,7 +54,15 @@ class DubboClient extends EventEmitter {
             retries: 5,
             pool: 5
         }, option);
-        this._ready = {};
+
+        this._ready = Object.keys(option.services).reduce((map: any, name) => {
+            map[name] = {
+                ready: false,
+                resolve: []
+            };
+            return map;
+        }, {});
+
         this.initialZookeeper();
         this.registerConsumer();
     }
@@ -120,12 +128,7 @@ class DubboClient extends EventEmitter {
         }
 
         let ready = this._ready[service];
-        if (!ready) {
-            ready = this._ready[service] = {
-                ready: false,
-                resolve: []
-            };
-        }
+
         if (ready.ready) {
             return this;
         } else {

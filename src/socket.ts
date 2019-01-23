@@ -65,6 +65,7 @@ class Socket {
                 this.invokePackage = null;
                 this.heartBeatLock = false;
                 this.isBusy = false;
+                this.service._nextTask(this.provider);
             })
         }
     }
