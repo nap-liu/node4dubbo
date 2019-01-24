@@ -84,7 +84,7 @@ class Socket {
     clear(noticeParent: boolean = true) {
         if (this.socket) {
             if (noticeParent) {
-                this.service._socketClose(this);
+                this.service._socketClose(this.provider);
             }
             if (!this.socket.destroyed) {
                 this.socket.destroy();
@@ -140,6 +140,7 @@ class Socket {
             }
         }, 5000);
         this.isBusy = false;
+        this.provider.retryCount = 1;
     }
 
 

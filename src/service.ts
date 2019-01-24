@@ -181,21 +181,22 @@ class Service {
 
     /**
      * socket异常断开 重连服务
-     * @param {Socket} socket
+     * @param {Provider} provider
      * @private
      */
-    _socketClose(socket: Socket) {
-        const index = this._providers.findIndex(item => item.socket === socket);
-        const provider = this._providers[index];
-        provider.retryCount++;
+    _socketClose(provider: Provider) {
+        if (provider.retryCount === 1) {
+            provider.retryCount += 1;
+        } else {
+            provider.retryCount *= provider.retryCount;
+        }
         debug(
             '线程池socket异常断开 开始重试',
             `${provider.hostname}:${provider.port} ${provider.query.interface}@${provider.query.version}`,
-            index
         );
         setTimeout(() => {
             this._emit('dubbo-socket-retry', provider);
-            this._providers[index].socket = new Socket(provider, this);
+            provider.socket = new Socket(provider, this);
         }, 1000 * provider.retryCount);
     }
 
