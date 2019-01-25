@@ -52,7 +52,7 @@ class DubboClient extends EventEmitter {
             sessionTimeout: 30000,
             spinDelay: 1000,
             retries: 5,
-            pool: 5
+            pool: 2
         }, option);
 
         this._ready = Object.keys(option.services).reduce((map: any, name) => {

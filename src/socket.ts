@@ -3,36 +3,37 @@
  */
 import {InvokePackage, Provider} from "../typings";
 import net = require('net');
-import decode from './decode'
+import Decode from './decode'
 import Encode from './encode';
 import Service from './service'
 
 const debug = require('debug')('dubbo:client:socket');
 
 const HEADER_LENGTH = 16;
-const FLAG_EVENT = 0x20;
+const MAX_ID = 9223372036854775807;
+const HEART_BEAT_SEND = Buffer.from([0xda, 0xbb, 0xe2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01, 0x4e]);
+const HEART_BEAT_RECEIVE = Buffer.from([0xda, 0xbb, 0x22, 0x14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01, 0x4e]);
+const HEADE_INVOKE_RESPONSE = Buffer.from([0xda, 0xbb, 0x02, 0x14]);
 
 class Socket {
     socket: net.Socket;
-    invokePackage: InvokePackage;
-    isBusy: boolean;
     heartBeatInter: NodeJS.Timeout;
-    heartBeatLock: boolean;
-    buffer: Buffer[];
-    bufferLength: number;
     provider: Provider;
     service: Service;
+    id: number;
+    tasks: {
+        [x: string]: InvokePackage;
+    };
+    buffer: Buffer;
 
     constructor(provider: Provider, service: Service) {
         const {hostname, port} = provider;
 
         this.provider = provider;
-        this.isBusy = false;
-        this.invokePackage = null;
         this.service = service;
-
-        this.buffer = [];
-        this.bufferLength = HEADER_LENGTH;
+        this.buffer = Buffer.from([]);
+        this.id = 0;
+        this.tasks = {};
 
         this.socket = net.connect(+port, hostname);
         this.socket.on('close', this.close.bind(this));
@@ -44,30 +45,80 @@ class Socket {
     }
 
     invoke(invokePackage: InvokePackage) {
-        this.isBusy = true;
-        this.heartBeatLock = true;
-        this.invokePackage = invokePackage;
+        while (this.tasks[this.id]) {
+            this.id++;
+            if (this.id >= MAX_ID) {
+                this.id = 0;
+            }
+        }
+
+        invokePackage.id = this.id;
+        this.tasks[this.id] = invokePackage;
         const params = new Encode(invokePackage, this.provider);
         this.socket.write(params.toBuffer());
     }
 
-    decodeBuffer(data: Buffer) {
-        // 如果不是心跳事件则进行解析
-        if (!((data[2] & FLAG_EVENT) !== 0)) {
-            decode(data, (error: Error, result: any) => {
-                if (this.invokePackage) {
-                    if (error) {
-                        this.invokePackage.reject(error)
-                    } else {
-                        this.invokePackage.resolve(result)
+    cancel(invokePackage: InvokePackage) {
+        delete this.tasks[invokePackage.id];
+    }
+
+    decodeBuffer() {
+        const data = this.buffer;
+        if (data.length < HEADER_LENGTH) {
+            debug('分包太小缓存buffer');
+            return
+        }
+        const length = data.readInt32BE(12) + HEADER_LENGTH;
+
+        if (data.length < length) {
+            debug('缓存buffer');
+            return;
+        }
+
+        const decode = new Decode(data);
+        const id = decode.readId();
+        const invokePackage = this.tasks[id];
+
+        if (invokePackage) {
+            decode.readResult((error: Error, result: any) => {
+                if (invokePackage) {
+                    try {
+                        if (error) {
+                            invokePackage.reject(error)
+                        } else {
+                            invokePackage.resolve(result)
+                        }
+                    } catch (e) {
+                        debug('dubbo 回调出错', e);
                     }
                 }
-                this.invokePackage = null;
-                this.heartBeatLock = false;
-                this.isBusy = false;
-                this.service._nextTask(this.provider);
-            })
+                delete this.tasks[id];
+                debug('dubbo 解包完成 移除任务', id, length)
+            });
+        } else {
+            debug('dubbo 结果丢弃', id, length);
         }
+
+        let next = data.slice(length);
+        this.buffer = next;
+
+        if (data.length > length) {
+            debug('dubbo socket沾包 拆包', id, length);
+            const headLength = HEART_BEAT_RECEIVE.length;
+            let head = next.slice(0, headLength);
+            while (HEART_BEAT_RECEIVE.equals(head)) {
+                debug('移除心跳包', id);
+                next = next.slice(headLength);
+                head = next.slice(0, headLength);
+            }
+            if (next.length > headLength && next.length >= next.readInt32BE(12) + HEADER_LENGTH) {
+                this.buffer = next;
+                this.decodeBuffer();
+            } else {
+                debug('dubbo 沾包数据包不完整', id, length, next.length, next);
+            }
+        }
+
     }
 
     getInfo(): string {
@@ -90,43 +141,40 @@ class Socket {
                 this.socket.destroy();
             }
             this.socket = null;
-            this.invokePackage = null;
-            this.isBusy = true;
-            this.bufferLength = 0;
-            this.buffer = null;
             this.provider = null;
             this.service = null;
+            this.tasks = null;
+            this.buffer = null;
             clearInterval(this.heartBeatInter);
         }
     }
 
     close(had_error: boolean) {
         debug('socket 关闭', this.getInfo());
-        if (had_error && this.invokePackage && this.invokePackage.reject) {
-            this.invokePackage.reject(new Error('socket 异常退出'));
+        if (had_error) {
+            Object.keys(this.tasks).forEach(id => {
+                const invokePackage = this.tasks[id];
+                invokePackage.reject(new Error('socket 异常退出'));
+            });
         }
         this.clear()
     }
 
     error(error: Error) {
         debug('socket 错误', this.getInfo());
-        if (this.invokePackage && this.invokePackage.reject) {
-            this.invokePackage.reject(error);
-        }
+        Object.keys(this.tasks).forEach(id => {
+            const invokePackage = this.tasks[id];
+            invokePackage.reject(error);
+        });
         this.clear()
     }
 
     data(data: Buffer) {
-        // 第一个包读取总包长度
-        if (this.buffer.length === 0) {
-            this.bufferLength += data.readInt32BE(12);
-        }
-        this.buffer.push(data);
-        const heap = Buffer.concat(this.buffer);
-        if (heap.length === this.bufferLength) {
-            this.bufferLength = HEADER_LENGTH;
-            this.buffer = [];
-            this.decodeBuffer(heap);
+        if (!data.equals(HEART_BEAT_RECEIVE)) {
+            this.buffer = Buffer.concat([this.buffer, data]);
+            this.decodeBuffer();
+        } else {
+            debug('dubbo 心跳包')
         }
     }
 
@@ -134,21 +182,21 @@ class Socket {
     connect() {
         debug('socket 连接成功 开始发送心跳', this.getInfo());
         this.heartBeatInter = setInterval(() => {
-            if (!this.heartBeatLock) {
-                // prettier-ignore
-                this.socket.write(Buffer.from([0xda, 0xbb, 0xe2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01, 0x4e]))
+            if (this.buffer.length) {
+                debug('dubbo 当前有活动方法 暂停心跳');
+            } else {
+                this.socket.write(HEART_BEAT_SEND)
             }
         }, 5000);
-        this.isBusy = false;
         this.provider.retryCount = 1;
     }
 
-
     timeout() {
         debug('socket 连接超时', this.getInfo());
-        if (this.invokePackage && this.invokePackage.reject) {
-            this.invokePackage.reject(new Error('socket 超时异常'));
-        }
+        Object.keys(this.tasks).forEach(id => {
+            const invokePackage = this.tasks[id];
+            invokePackage.reject(new Error('socket 超时异常'));
+        });
         this.clear();
     }
 }

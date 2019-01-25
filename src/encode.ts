@@ -28,6 +28,7 @@ class Encode {
             throw new Error(`Data length too large: ${length}, maximum payload: ${MAX_LEN}`);
         }
         head.writeInt32BE(length, 12);
+        head.writeIntBE(this.invoke.id, 4, 8);
         return head
     }
 

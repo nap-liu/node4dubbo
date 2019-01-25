@@ -17,13 +17,14 @@ class Service {
     _providers: Provider[];
     _parent: DubboClient;
     _name: string;
-    _tasks: Function[];
+    _index: number;
 
     constructor(serviceName: string, service: service, providers: UrlWithParsedQuery[], dubbo: DubboClient) {
         this._parent = dubbo;
         this._service = service;
         this._name = serviceName;
         this._tasks = [];
+        this._index = 0;
 
         this._providers = providers.reduce((pool: Provider[], current: Provider) => {
             let currentPool: number = service.pool;
@@ -104,9 +105,22 @@ class Service {
             }
             return new Promise(async (resolve, reject) => {
                 this._getProvider((provider: Provider) => {
-                    const invoker = {resolve, reject, method, args, service: _service};
+                    const invoker = {
+                        resolve,
+                        reject,
+                        method,
+                        args,
+                        service: _service
+                    };
                     provider.socket.invoke(invoker);
-                    setTimeout(reject, +provider.query['default.timeout'] || 1000 * 5, new Error(`${_service.interface}.${method} 调用超时`))
+                    setTimeout(() => {
+                        try {
+                            reject(new Error(`${_service.interface}.${method} 调用超时`))
+                        } catch (e) {
+                            debug('回调业务出错', e)
+                        }
+                        provider.socket.cancel(invoker);
+                    }, +provider.query['default.timeout'] || 1000 * 5)
                 });
             })
         }
@@ -118,22 +132,13 @@ class Service {
      * @private
      */
     _getProvider(callback: Function) {
-        const provider = this._providers.find(item => item.socket.isBusy === false);
-        if (provider) {
-            callback(provider);
+        if (this._providers.length) {
+            callback(this._providers[this._index++]);
+            if (this._index >= this._providers.length) {
+                this._index = 0;
+            }
         } else {
-            this._tasks.push(callback);
-        }
-    }
-
-    /**
-     * 从任务缓冲区中取回等待执行的任务
-     * @private
-     */
-    _nextTask(provider: Provider) {
-        if (this._tasks.length) {
-            const callback: Function = this._tasks.shift();
-            callback(provider);
+            throw new Error(`interface ${this._service.interface} 没有提供 provider`);
         }
     }
 

@@ -103,6 +103,7 @@ export interface InvokePackage {
     method: string;
     args: any[];
     service: service;
+    id?: number;
 }
 
 type proxyFunction = (...args: any[]) => Promise<any>
