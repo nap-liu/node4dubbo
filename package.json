@@ -9,7 +9,7 @@
     "build": "tsc --build tsconfig.json"
   },
   "files": [
-    "lib",
+    "lib/*.js",
     "typings",
     "package.json"
   ],
