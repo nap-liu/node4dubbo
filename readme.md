@@ -2,6 +2,11 @@
 
 该模块参考了 [node-zookeeper-dubbo](https://www.npmjs.com/package/node-zookeeper-dubbo) 模块
 
+**CHANGE.LOG**
+
+* 2019-01-25 
+  * 修改默认连接池数量为 2
+  * 重构调用策略同等数量调用，效率提升了4倍左右
 
 **附加库**
 * [js-to-java](https://www.npmjs.com/package/js-to-java) 数据转换库
@@ -78,7 +83,7 @@ remoteDubbo.ready().then(() => {
 * version `string` dubbo版本
 * application `string` 本地客户端名称
 * address `string` zookeeper服务地址
-* pool `number` 内部线程池数量 默认 5
+* pool `number` 内部线程池数量 默认 2
 * services `object` 声明使用的dubbo接口
 * services.remote.interface `string` dubbo公开接口
 * services.remote.version `string` dubbo接口版本
