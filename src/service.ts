@@ -29,7 +29,6 @@ class Service {
 
         this._providers = providers.reduce((pool: Provider[], current: Provider) => {
             let currentPool: number = service.pool;
-            console.log(current)
             while (currentPool--) {
                 pool.push(_.clone(current));
             }
