@@ -10,6 +10,7 @@ import * as _ from 'lodash';
 
 const debug = require('debug')('dubbo:client:service');
 
+
 class Service {
     [x: string]: Function | any;
 
@@ -23,11 +24,12 @@ class Service {
         this._parent = dubbo;
         this._service = service;
         this._name = serviceName;
-        this._tasks = [];
         this._index = 0;
+
 
         this._providers = providers.reduce((pool: Provider[], current: Provider) => {
             let currentPool: number = service.pool;
+            console.log(current)
             while (currentPool--) {
                 pool.push(_.clone(current));
             }
@@ -112,15 +114,17 @@ class Service {
                         args,
                         service: _service
                     };
-                    provider.socket.invoke(invoker);
-                    setTimeout(() => {
-                        try {
-                            reject(new Error(`${_service.interface}.${method} 调用超时`))
-                        } catch (e) {
-                            debug('回调业务出错', e)
-                        }
-                        provider.socket.cancel(invoker);
-                    }, +provider.query['default.timeout'] || 1000 * 5)
+
+                    provider.socket.invoke(invoker).then(() => {
+                        setTimeout(() => {
+                            try {
+                                reject(new Error(`${_service.interface}.${method} 调用超时`))
+                            } catch (e) {
+                                debug('回调业务出错', e)
+                            }
+                            provider.socket.cancel(invoker);
+                        }, +provider.query['default.timeout'] || 1000 * 5)
+                    });
                 });
             })
         }

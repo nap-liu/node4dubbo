@@ -1,7 +1,10 @@
 /**
  * Created by liuxi on 2019/01/18.
  */
+import Protocol from './protocol';
+
 const Decoder = require('hessian.js').DecoderV2;
+
 
 const Response = {
     OK: 20,
@@ -54,10 +57,6 @@ class Decode {
         } catch (err) {
             cb(err)
         }
-    }
-
-    readId() {
-        return this.data.readIntBE(4, 8);
     }
 }
 

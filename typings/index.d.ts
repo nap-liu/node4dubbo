@@ -104,6 +104,7 @@ export interface InvokePackage {
     args: any[];
     service: service;
     id?: number;
+    startInvoke?: Function;
 }
 
 type proxyFunction = (...args: any[]) => Promise<any>

@@ -2,10 +2,9 @@
  * Created by liuxi on 2019/01/18.
  */
 import {attachmentsFunction, InvokePackage, Provider} from "../typings";
+import Protocol from './protocol';
 
 const Encoder = require('hessian.js').EncoderV2;
-const MAX_LEN = 8388608; // 8 * 1024 * 1024, default maximum length of body
-
 
 class Encode {
     invoke: InvokePackage;
@@ -18,19 +17,12 @@ class Encode {
 
     toBuffer(): Buffer {
         const body = this.body();
-        const head = this.head(body.length);
-        return Buffer.concat([head, body])
+        const head = new Protocol();
+        head.setBodyLength(body.length);
+        head.setInvokeId(this.invoke.id);
+        return Buffer.concat([head.toBuffer(), body])
     }
 
-    head(length: number): Buffer {
-        const head = Buffer.from([0xda, 0xbb, 0xc2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-        if (length > MAX_LEN) {
-            throw new Error(`Data length too large: ${length}, maximum payload: ${MAX_LEN}`);
-        }
-        head.writeInt32BE(length, 12);
-        head.writeIntBE(this.invoke.id, 4, 8);
-        return head
-    }
 
     body(): Buffer {
         const {method, args, service} = this.invoke;

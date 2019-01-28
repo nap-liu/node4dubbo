@@ -5,15 +5,12 @@ import {InvokePackage, Provider} from "../typings";
 import net = require('net');
 import Decode from './decode'
 import Encode from './encode';
-import Service from './service'
+import Service from './service';
+import Protocol, {MAX_ID} from './protocol';
 
 const debug = require('debug')('dubbo:client:socket');
 
-const HEADER_LENGTH = 16;
-const MAX_ID = 9223372036854775807;
-const HEART_BEAT_SEND = Buffer.from([0xda, 0xbb, 0xe2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01, 0x4e]);
-const HEART_BEAT_RECEIVE = Buffer.from([0xda, 0xbb, 0x22, 0x14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01, 0x4e]);
-const HEADE_INVOKE_RESPONSE = Buffer.from([0xda, 0xbb, 0x02, 0x14]);
+const {PROTOCOL_LENGTH} = Protocol;
 
 class Socket {
     socket: net.Socket;
@@ -25,6 +22,8 @@ class Socket {
         [x: string]: InvokePackage;
     };
     buffer: Buffer;
+    wait: InvokePackage[];
+    taskCount: number;
 
     constructor(provider: Provider, service: Service) {
         const {hostname, port} = provider;
@@ -34,6 +33,8 @@ class Socket {
         this.buffer = Buffer.from([]);
         this.id = 0;
         this.tasks = {};
+        this.taskCount = 0;
+        this.wait = [];
 
         this.socket = net.connect(+port, hostname);
         this.socket.on('close', this.close.bind(this));
@@ -44,18 +45,29 @@ class Socket {
         debug('开始建立点对点服务器socket连接', this.getInfo());
     }
 
-    invoke(invokePackage: InvokePackage) {
-        while (this.tasks[this.id]) {
-            this.id++;
-            if (this.id >= MAX_ID) {
-                this.id = 0;
+    invoke(invokePackage: InvokePackage): Promise<void> {
+        return new Promise((resolve) => {
+            if (this.taskCount >= +this.provider.query['default.executes']) {
+                invokePackage.startInvoke = resolve;
+                this.wait.push(invokePackage);
+                debug('并发数超过最大值 缓存到队列');
+                return;
             }
-        }
 
-        invokePackage.id = this.id;
-        this.tasks[this.id] = invokePackage;
-        const params = new Encode(invokePackage, this.provider);
-        this.socket.write(params.toBuffer());
+            this.taskCount++;
+            while (this.tasks[this.id]) {
+                this.id++;
+                if (this.id >= MAX_ID) {
+                    this.id = 0;
+                }
+            }
+
+            invokePackage.id = this.id;
+            this.tasks[this.id] = invokePackage;
+            const params = new Encode(invokePackage, this.provider);
+            this.socket.write(params.toBuffer());
+            resolve();
+        });
     }
 
     cancel(invokePackage: InvokePackage) {
@@ -64,19 +76,35 @@ class Socket {
 
     decodeBuffer() {
         const data = this.buffer;
-        if (data.length < HEADER_LENGTH) {
+        if (data.length < PROTOCOL_LENGTH) {
             debug('分包太小缓存buffer');
             return
         }
-        const length = data.readInt32BE(12) + HEADER_LENGTH;
 
-        if (data.length < length) {
+        const proto = new Protocol(data);
+        const length = proto.getBodyLength();
+
+        if (data.length < PROTOCOL_LENGTH + length) {
             debug('缓存buffer');
             return;
         }
 
+        if (proto.isHeartBeat()) {
+            this.buffer = this.buffer.slice(PROTOCOL_LENGTH + length);
+            debug('心跳包 跳过');
+            return;
+        }
+
+
+        if (!proto.isResponse()) {
+            const drop = this.buffer.slice(0, PROTOCOL_LENGTH + length);
+            this.buffer = this.buffer.slice(PROTOCOL_LENGTH + length);
+            debug('不是调用返回包 丢弃', drop);
+            return;
+        }
+
         const decode = new Decode(data);
-        const id = decode.readId();
+        const id = proto.getInvokeId();
         const invokePackage = this.tasks[id];
 
         if (invokePackage) {
@@ -93,32 +121,32 @@ class Socket {
                     }
                 }
                 delete this.tasks[id];
-                debug('dubbo 解包完成 移除任务', id, length)
+                this.execWaitTask();
+                debug('dubbo 解包完成 移除任务', id, length);
             });
         } else {
             debug('dubbo 结果丢弃', id, length);
         }
 
-        let next = data.slice(length);
-        this.buffer = next;
+        this.buffer = this.buffer.slice(PROTOCOL_LENGTH + length);
 
-        if (data.length > length) {
-            debug('dubbo socket沾包 拆包', id, length);
-            const headLength = HEART_BEAT_RECEIVE.length;
-            let head = next.slice(0, headLength);
-            while (HEART_BEAT_RECEIVE.equals(head)) {
-                debug('移除心跳包', id);
-                next = next.slice(headLength);
-                head = next.slice(0, headLength);
-            }
-            if (next.length > headLength && next.length >= next.readInt32BE(12) + HEADER_LENGTH) {
-                this.buffer = next;
-                this.decodeBuffer();
-            } else {
-                debug('dubbo 沾包数据包不完整', id, length, next.length, next);
-            }
+        if (this.buffer.length) {
+            debug('粘包 继续解包');
+            this.decodeBuffer();
         }
+    }
 
+    /**
+     * 执行缓存队列里面的任务
+     */
+    execWaitTask() {
+        this.taskCount--;
+        if (this.wait.length) {
+            debug('执行缓存队列任务');
+            const task = this.wait.shift();
+            task.startInvoke();
+            this.invoke(task);
+        }
     }
 
     getInfo(): string {
@@ -170,12 +198,8 @@ class Socket {
     }
 
     data(data: Buffer) {
-        if (!data.equals(HEART_BEAT_RECEIVE)) {
-            this.buffer = Buffer.concat([this.buffer, data]);
-            this.decodeBuffer();
-        } else {
-            debug('dubbo 心跳包')
-        }
+        this.buffer = Buffer.concat([this.buffer, data]);
+        this.decodeBuffer();
     }
 
 
@@ -185,9 +209,9 @@ class Socket {
             if (this.buffer.length) {
                 debug('dubbo 当前有活动方法 暂停心跳');
             } else {
-                this.socket.write(HEART_BEAT_SEND)
+                this.socket.write(Protocol.HEART_BEAT_SEND)
             }
-        }, 5000);
+        }, 1000 * 5);
         this.provider.retryCount = 1;
     }
 
