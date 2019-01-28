@@ -179,7 +179,7 @@ class Socket {
 
     close(had_error: boolean) {
         debug('socket 关闭', this.getInfo());
-        if (had_error) {
+        if (had_error && this.tasks) {
             Object.keys(this.tasks).forEach(id => {
                 const invokePackage = this.tasks[id];
                 invokePackage.reject(new Error('socket 异常退出'));
@@ -190,10 +190,12 @@ class Socket {
 
     error(error: Error) {
         debug('socket 错误', this.getInfo());
-        Object.keys(this.tasks).forEach(id => {
-            const invokePackage = this.tasks[id];
-            invokePackage.reject(error);
-        });
+        if (this.tasks) {
+            Object.keys(this.tasks).forEach(id => {
+                const invokePackage = this.tasks[id];
+                invokePackage.reject(error);
+            });
+        }
         this.clear()
     }
 
