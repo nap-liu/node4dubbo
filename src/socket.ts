@@ -24,6 +24,7 @@ class Socket {
     buffer: Buffer;
     wait: InvokePackage[];
     taskCount: number;
+    isReady: boolean;
 
     constructor(provider: Provider, service: Service) {
         const {hostname, port} = provider;
@@ -35,6 +36,7 @@ class Socket {
         this.tasks = {};
         this.taskCount = 0;
         this.wait = [];
+        this.isReady = false;
 
         this.socket = net.connect(+port, hostname);
         this.socket.on('close', this.close.bind(this));
@@ -47,6 +49,13 @@ class Socket {
 
     invoke(invokePackage: InvokePackage): Promise<void> {
         return new Promise((resolve) => {
+            if (!this.isReady) {
+                invokePackage.startInvoke = resolve;
+                this.wait.push(invokePackage);
+                debug('socket未初始化完毕 缓存到队列');
+                return;
+            }
+
             if (this.taskCount >= +this.provider.query['default.executes']) {
                 invokePackage.startInvoke = resolve;
                 this.wait.push(invokePackage);
@@ -176,6 +185,7 @@ class Socket {
             this.service = null;
             this.tasks = null;
             this.buffer = null;
+            this.isReady = false;
             clearInterval(this.heartBeatInter);
         }
     }
@@ -207,9 +217,10 @@ class Socket {
         this.decodeBuffer();
     }
 
-
     connect() {
         debug('socket 连接成功 开始发送心跳', this.getInfo());
+        this.isReady = true;
+        this.execWaitTask();
         this.heartBeatInter = setInterval(() => {
             if (this.buffer.length) {
                 debug('dubbo 当前有活动方法 暂停心跳');

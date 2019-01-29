@@ -117,7 +117,7 @@ class Service {
                     provider.socket.invoke(invoker).then(() => {
                         setTimeout(() => {
                             try {
-                                reject(new Error(`${_service.interface}.${method} 调用超时`))
+                                reject(new Error(`provider: ${provider.hostname}:${provider.port} ${_service.interface}.${method} 调用超时`))
                             } catch (e) {
                                 debug('回调业务出错', e)
                             }
