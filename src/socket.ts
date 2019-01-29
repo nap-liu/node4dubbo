@@ -65,7 +65,10 @@ class Socket {
             invokePackage.id = this.id;
             this.tasks[this.id] = invokePackage;
             const params = new Encode(invokePackage, this.provider);
-            this.socket.write(params.toBuffer());
+            const buffer = params.toBuffer();
+            while (this.socket.write(buffer) === false) {
+
+            }
             resolve();
         });
     }
