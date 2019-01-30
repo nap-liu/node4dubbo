@@ -92,7 +92,7 @@ class Socket {
     }
 
     cancel(invokePackage: InvokePackage) {
-        if (this.tasks[invokePackage.id]) {
+        if (this.tasks && this.tasks[invokePackage.id]) {
             this.taskCount--;
             delete this.tasks[invokePackage.id];
         }
