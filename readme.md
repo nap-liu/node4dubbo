@@ -4,6 +4,12 @@
 
 **CHANGE.LOG**
 
+* 2019-01-30
+  * 移除对单provider线程池 保证高并发执行稳定
+  * 限制对单provider最大并发数为总并发数的一半
+  * 修复兜底超时回调可能会导致并发数错误问题
+  
+
 * 2019-01-29
   * 修复调用异常错误处理超时
 
@@ -91,7 +97,6 @@ remoteDubbo.ready().then(() => {
 * version `string` dubbo版本
 * application `string` 本地客户端名称
 * address `string` zookeeper服务地址
-* pool `number` 内部线程池数量 默认 2
 * services `object` 声明使用的dubbo接口
 * services.remote.interface `string` dubbo公开接口
 * services.remote.version `string` dubbo接口版本

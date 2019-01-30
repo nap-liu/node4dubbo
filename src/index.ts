@@ -51,8 +51,7 @@ class DubboClient extends EventEmitter {
             version: '2.5.3.6',
             sessionTimeout: 30000,
             spinDelay: 1000,
-            retries: 5,
-            pool: 2
+            retries: 5
         }, option);
 
         this._ready = Object.keys(option.services).reduce((map: any, name) => {
@@ -80,7 +79,6 @@ class DubboClient extends EventEmitter {
     providerReady(serviceName: string, service: service, providers: UrlWithParsedQuery[]) {
         debug('找到 provider', providers.map(item => `${item.hostname}:${item.port} ${item.query.interface}@${item.query.version}`).join());
         service.dubboVersion = this.option.version;
-        service.pool = this.option.pool;
 
         const matchedProviders = providers.filter(provider => {
             return (

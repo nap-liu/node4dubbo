@@ -26,14 +26,7 @@ class Service {
         this._name = serviceName;
         this._index = 0;
 
-
-        this._providers = providers.reduce((pool: Provider[], current: Provider) => {
-            let currentPool: number = service.pool;
-            while (currentPool--) {
-                pool.push(_.clone(current));
-            }
-            return pool
-        }, []).map((provider: Provider) => {
+        this._providers = providers.map((provider: Provider) => {
             provider.socket = new Socket(provider, this);
             provider.retryCount = 1;
             return provider;
@@ -106,18 +99,26 @@ class Service {
             }
             return new Promise(async (resolve, reject) => {
                 this._getProvider((provider: Provider) => {
+                    let timer: NodeJS.Timeout;
+
                     const invoker = {
-                        resolve,
-                        reject,
+                        resolve: (params: any) => {
+                            clearTimeout(timer);
+                            resolve(params);
+                        },
+                        reject: (params: any) => {
+                            clearTimeout(timer);
+                            reject(params);
+                        },
                         method,
                         args,
                         service: _service
-                    };
+                    } as InvokePackage;
 
                     provider.socket.invoke(invoker).then(() => {
-                        setTimeout(() => {
+                        timer = setTimeout(() => {
                             try {
-                                reject(new Error(`provider: ${provider.hostname}:${provider.port} ${_service.interface}.${method} 调用超时`))
+                                reject(new Error(`provider: ${provider.hostname}:${provider.port} ${_service.interface}.${method}@${invoker.id} 调用超时`))
                             } catch (e) {
                                 debug('回调业务出错', e)
                             }
@@ -246,13 +247,7 @@ class Service {
         this._providers = [
             ...this._providers,
             // 生成新线程池
-            ...newLinks.reduce((pool: Provider[], current: Provider) => {
-                let currentPool: number = service.pool;
-                while (currentPool--) {
-                    pool.push(_.clone(current));
-                }
-                return pool
-            }, []).map((provider: Provider) => {
+            ...newLinks.map((provider: Provider) => {
                 provider.socket = new Socket(provider, this);
                 return provider;
             })

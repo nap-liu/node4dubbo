@@ -38,11 +38,6 @@ export interface DubboOption extends connectOption {
      * 远程dubbo接口interface声明
      */
     services: services;
-
-    /**
-     * 每个interface的线程池数量 默认 5
-     */
-    pool: number;
 }
 
 export type params = (param: any, java: java) => any;
@@ -52,10 +47,6 @@ export type attachmentsObject = {
 };
 
 export interface service {
-    /**
-     * 每个interface的线程池数量 自动赋值
-     */
-    pool: number;
     /**
      * dubbo version 自动赋值
      */

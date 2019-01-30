@@ -25,6 +25,7 @@ class Socket {
     wait: InvokePackage[];
     taskCount: number;
     isReady: boolean;
+    maxExecutes: number;
 
     constructor(provider: Provider, service: Service) {
         const {hostname, port} = provider;
@@ -38,6 +39,9 @@ class Socket {
         this.wait = [];
         this.isReady = false;
 
+        // 最大并发数为provider的一半 保证服务不会被瞬间高并发打死 保证服务端能正常相应调用请求
+        this.maxExecutes = parseInt(`${+this.provider.query['default.executes'] * .5}`);
+
         this.socket = net.connect(+port, hostname);
         this.socket.on('close', this.close.bind(this));
         this.socket.on('data', this.data.bind(this));
@@ -49,6 +53,11 @@ class Socket {
 
     invoke(invokePackage: InvokePackage): Promise<void> {
         return new Promise((resolve) => {
+            if (!this.provider) {
+                debug('当前provider 不可用');
+                return
+            }
+
             if (!this.isReady) {
                 invokePackage.startInvoke = resolve;
                 this.wait.push(invokePackage);
@@ -56,40 +65,43 @@ class Socket {
                 return;
             }
 
-            if (this.taskCount >= +this.provider.query['default.executes']) {
+            if (this.taskCount >= this.maxExecutes) {
                 invokePackage.startInvoke = resolve;
                 this.wait.push(invokePackage);
                 debug('并发数超过最大值 缓存到队列');
                 return;
             }
 
-            this.taskCount++;
             while (this.tasks[this.id]) {
                 this.id++;
                 if (this.id >= MAX_ID) {
                     this.id = 0;
                 }
             }
-
             invokePackage.id = this.id;
             this.tasks[this.id] = invokePackage;
             const params = new Encode(invokePackage, this.provider);
             const buffer = params.toBuffer();
             while (this.socket.write(buffer) === false) {
-
+                debug(`socket 写缓冲区失败 ${invokePackage.id}`);
             }
+            this.taskCount++;
+            this.id++;
             resolve();
         });
     }
 
     cancel(invokePackage: InvokePackage) {
-        delete this.tasks[invokePackage.id];
+        if (this.tasks[invokePackage.id]) {
+            this.taskCount--;
+            delete this.tasks[invokePackage.id];
+        }
     }
 
     decodeBuffer() {
         const data = this.buffer;
         if (data.length < PROTOCOL_LENGTH) {
-            debug('分包太小缓存buffer');
+            debug('分包太小缓存buffer', data.length);
             return
         }
 
@@ -97,25 +109,32 @@ class Socket {
         const length = proto.getBodyLength();
 
         if (data.length < PROTOCOL_LENGTH + length) {
-            debug('缓存buffer');
+            debug(`缓存buffer ${proto.getInvokeId()}`);
             return;
         }
 
         if (proto.isHeartBeat()) {
             this.buffer = this.buffer.slice(PROTOCOL_LENGTH + length);
-            debug('心跳包 跳过');
+            debug('心跳包 跳过', length);
+            if (this.buffer.length) {
+                debug('心跳包 继续解包');
+                this.decodeBuffer()
+            }
             return;
         }
 
 
         if (!proto.isResponse()) {
-            const drop = this.buffer.slice(0, PROTOCOL_LENGTH + length);
             this.buffer = this.buffer.slice(PROTOCOL_LENGTH + length);
-            debug('不是调用返回包 丢弃', drop);
+            if (this.buffer.length) {
+                this.decodeBuffer()
+            }
             return;
         }
 
-        const decode = new Decode(data);
+        const decode = new Decode(this.buffer);
+        this.buffer = this.buffer.slice(PROTOCOL_LENGTH + length);
+
         const id = proto.getInvokeId();
         const invokePackage = this.tasks[id];
 
@@ -132,15 +151,14 @@ class Socket {
                         debug('dubbo 回调出错', e);
                     }
                 }
-                delete this.tasks[id];
-                this.execWaitTask();
                 debug('dubbo 解包完成 移除任务', id, length);
+                delete this.tasks[id];
+                this.taskCount--;
+                this.execWaitTask();
             });
         } else {
             debug('dubbo 结果丢弃', id, length);
         }
-
-        this.buffer = this.buffer.slice(PROTOCOL_LENGTH + length);
 
         if (this.buffer.length) {
             debug('粘包 继续解包');
@@ -152,12 +170,12 @@ class Socket {
      * 执行缓存队列里面的任务
      */
     execWaitTask() {
-        this.taskCount--;
         if (this.wait.length) {
-            debug('执行缓存队列任务');
-            const task = this.wait.shift();
-            task.startInvoke();
-            this.invoke(task);
+            const tasks = this.wait.splice(0, this.maxExecutes - this.taskCount);
+            tasks.forEach(task => {
+                task.startInvoke();
+                this.invoke(task);
+            });
         }
     }
 
