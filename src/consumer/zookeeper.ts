@@ -1,4 +1,3 @@
-/// <reference path="../typings/node-zookeeper-client.d.ts" />
 /**
  * Created by liuxi on 2019/01/18.
  */
@@ -7,34 +6,33 @@ import {
     State,
     Event,
     Client,
-    Stat,
     ClientError,
     CreateMode
 } from 'node-zookeeper-client';
-import {DubboClient} from './index';
 import {
-    DubboOption,
-    service, services
-} from '../typings';
-import url = require('url')
+    Option,
+    Service
+} from '../../typings/consumer';
+import url = require('url');
 import {UrlObject, UrlWithParsedQuery} from "url";
 import os = require('os');
 import path = require('path');
-import {encode} from "punycode";
 
-const debug = require('debug')('dubbo:client:zookeeper');
+import {Consumer} from './index';
+
+const debug = require('debug')('dubbo:consumer:zookeeper');
 
 /**
  * zk 客户端封装
  */
 class Zookeeper {
     client: Client;
-    parent: DubboClient;
-    option: DubboOption;
+    parent: Consumer;
+    option: Option;
 
     children: UrlWithParsedQuery[];
 
-    constructor(option: DubboOption, parent: DubboClient) {
+    constructor(option: Option, parent: Consumer) {
         this.option = option;
         this.parent = parent;
         this.connect();
@@ -104,7 +102,7 @@ class Zookeeper {
             this.client.close();
             this.client = null;
             this.option = null;
-            this.parent.zk = null;
+            this.parent.zookeeper = null;
             this.parent = null;
         }
     }
@@ -118,7 +116,7 @@ class Zookeeper {
         });
     }
 
-    getChildrenWatcher(service: service, serviceName: string, event: Event) {
+    getChildrenWatcher(service: Service, serviceName: string, event: Event) {
         debug('zk watcher 服务节点改变');
         this.emit('zookeeper-node-change', {
             service,
@@ -138,7 +136,7 @@ class Zookeeper {
         // }
     }
 
-    getChildrenCallback(service: service, serviceName: string, error: ClientError, children: string[]) {
+    getChildrenCallback(service: Service, serviceName: string, error: ClientError, children: string[]) {
         if (error) {
             this.emit('error', error, {
                 service,
@@ -181,12 +179,12 @@ function ip(): string {
         .filter(Boolean)[0]
 }
 
-class DubboConsumer {
-    option: DubboOption;
+class ZookeeperConsumer {
+    option: Option;
     client: Zookeeper;
-    parent: DubboClient;
+    parent: Consumer;
 
-    constructor(client: Zookeeper, option: DubboOption, dubbo: DubboClient) {
+    constructor(client: Zookeeper, option: Option, dubbo: Consumer) {
         this.option = option;
         this.client = client;
         this.parent = dubbo;
@@ -195,7 +193,7 @@ class DubboConsumer {
         });
     }
 
-    createPath(service: service) {
+    createPath(service: Service) {
         const {option} = this;
         const info: UrlObject = {
             protocol: 'consumer',
@@ -280,5 +278,5 @@ class DubboConsumer {
     }
 }
 
-export {DubboConsumer};
+export {ZookeeperConsumer};
 export default Zookeeper

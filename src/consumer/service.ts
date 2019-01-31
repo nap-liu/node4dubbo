@@ -1,50 +1,51 @@
 /**
  * Created by liuxi on 2019/01/18.
  */
-import {DubboOption, InvokePackage, Provider, service} from "../typings";
+import {InvokePackage, Provider, Service as ServiceDefine} from "../../typings/consumer";
 import {UrlWithParsedQuery} from "url";
 import Socket from './socket';
 import java = require('js-to-java');
-import {DubboClient} from './index'
-import * as _ from 'lodash';
+import {Consumer} from './index'
 
-const debug = require('debug')('dubbo:client:service');
-
+const debug = require('debug')('dubbo:consumer:service');
 
 class Service {
-    [x: string]: Function | any;
+    service: ServiceDefine;
+    providers: Provider[];
+    parent: Consumer;
+    name: string;
+    index: number;
+    proxy: any;
 
-    _service: service;
-    _providers: Provider[];
-    _parent: DubboClient;
-    _name: string;
-    _index: number;
+    constructor(serviceName: string, service: ServiceDefine, providers: UrlWithParsedQuery[], dubbo: Consumer) {
+        this.parent = dubbo;
+        this.service = service;
+        this.name = serviceName;
+        this.index = 0;
+        this.proxy = {};
 
-    constructor(serviceName: string, service: service, providers: UrlWithParsedQuery[], dubbo: DubboClient) {
-        this._parent = dubbo;
-        this._service = service;
-        this._name = serviceName;
-        this._index = 0;
-
-        this._providers = providers.map((provider: Provider) => {
+        this.providers = providers.map((provider: Provider) => {
             provider.socket = new Socket(provider, this);
             provider.retryCount = 1;
             return provider;
         });
-        debug('创建dubbo线程池', this._providers.length);
-        debug('注入实例方法', this._service.interface);
-        this._injectInvokeProxy();
-        process.nextTick(this._ready.bind(this));
+
+        debug('创建dubbo线程池', this.providers.length);
+        debug('注入实例方法', this.service.interface);
+        this.injectInvokeProxy();
+        process.nextTick(this.ready.bind(this));
+        this.proxy.________NOT_INVOKE_THIS_______ = this.merge.bind(this);
+        return this.proxy;
     }
 
-    _ready() {
-        debug('服务初始化完成', this._service.interface);
-        this._emit('dubbo-ready', this._parent, this._service);
-        if (this._parent && this._parent._ready && this._parent._ready[this._name]) {
-            const ready = this._parent._ready[this._name];
+    ready() {
+        debug('服务初始化完成', this.service.interface);
+        this.emit('dubbo-ready', this.parent, this.service);
+        if (this.parent && this.parent.ready && this.parent.readys[this.name]) {
+            const ready = this.parent.readys[this.name];
             ready.ready = true;
             ready.resolve.forEach(item => {
-                item(this._parent);
+                item(this.parent.proxy);
             });
             ready.resolve = []
         }
@@ -56,9 +57,9 @@ class Service {
      * @param args
      * @private
      */
-    _emit(event: string | symbol, ...args: any[]) {
-        if (this._parent) {
-            this._parent.emit(event, ...args);
+    emit(event: string | symbol, ...args: any[]) {
+        if (this.parent) {
+            this.parent.emit(event, ...args);
         }
     }
 
@@ -66,18 +67,17 @@ class Service {
      * 注册代理方法
      * @private
      */
-    _injectInvokeProxy() {
+    injectInvokeProxy() {
         const allMethods: Map<string, Provider> = new Map();
-        this._providers.forEach(provider => {
+        this.providers.forEach(provider => {
             const {methods} = provider.query;
             (methods as string).split(',').forEach((item: string) => {
                 allMethods.set(item, provider);
             })
         });
         allMethods.forEach((provider: Provider, method) => {
-            this[method] = this._invoke(method, provider);
+            this.proxy[method] = this.invoke(method, provider);
         })
-
     }
 
     /**
@@ -87,10 +87,10 @@ class Service {
      * @returns {(...args: any[]) => Promise<any>}
      * @private
      */
-    _invoke(method: string, provider: Provider) {
+    invoke(method: string, provider: Provider) {
         return (...args: any[]) => {
-            const {_service} = this;
-            const {methods} = _service;
+            const {service} = this;
+            const {methods} = service;
             if (methods && methods[method] && methods[method].length) {
                 args = args.map((param, index) => {
                     const func = methods[method][index] || (param => param);
@@ -98,7 +98,7 @@ class Service {
                 })
             }
             return new Promise(async (resolve, reject) => {
-                this._getProvider((provider: Provider) => {
+                this.getProvider((provider: Provider) => {
                     let timer: NodeJS.Timeout;
 
                     const invoker = {
@@ -112,13 +112,13 @@ class Service {
                         },
                         method,
                         args,
-                        service: _service
+                        service: service
                     } as InvokePackage;
 
                     provider.socket.invoke(invoker).then(() => {
                         timer = setTimeout(() => {
                             try {
-                                reject(new Error(`provider: ${provider.hostname}:${provider.port} ${_service.interface}.${method}@${invoker.id} 调用超时`))
+                                reject(new Error(`provider: ${provider.hostname}:${provider.port} ${service.interface}.${method}@${invoker.id} 调用超时`))
                             } catch (e) {
                                 debug('回调业务出错', e)
                             }
@@ -135,14 +135,14 @@ class Service {
      * @returns {Promise<Provider>}
      * @private
      */
-    _getProvider(callback: Function) {
-        if (this._providers.length) {
-            callback(this._providers[this._index++]);
-            if (this._index >= this._providers.length) {
-                this._index = 0;
+    getProvider(callback: Function) {
+        if (this.providers.length) {
+            callback(this.providers[this.index++]);
+            if (this.index >= this.providers.length) {
+                this.index = 0;
             }
         } else {
-            throw new Error(`interface ${this._service.interface} 没有提供 provider`);
+            throw new Error(`interface ${this.service.interface} 没有提供 provider`);
         }
     }
 
@@ -152,11 +152,11 @@ class Service {
      * @param {string} port
      * @private
      */
-    _closeProviderByHost(host: string, port: string) {
-        if (Array.isArray(this._providers)) {
+    closeProviderByHost(host: string, port: string) {
+        if (Array.isArray(this.providers)) {
             const dels: number[] = [];
 
-            this._providers.forEach((item: Provider, index: number) => {
+            this.providers.forEach((item: Provider, index: number) => {
                 if (item.hostname === host && item.port === port) {
                     item.socket.clear(false);
                     dels.push(index);
@@ -164,7 +164,7 @@ class Service {
             });
 
             dels.reverse().forEach(item => {
-                this._providers.splice(item, 1);
+                this.providers.splice(item, 1);
             });
         }
     }
@@ -173,17 +173,16 @@ class Service {
      * 手动关闭 service 释放相关内存
      * @private
      */
-    _close() {
-        if (Array.isArray(this._providers)) {
-            this._providers.forEach((item: Provider, index: number) => {
+    close() {
+        if (Array.isArray(this.providers)) {
+            this.providers.forEach((item: Provider, index: number) => {
                 item.socket.clear(false);
             });
-
-            this._providers = null;
-            this._parent = null;
-            this._service = null;
-            Object.keys(this).forEach(key => {
-                delete this[key];
+            this.providers = null;
+            this.parent = null;
+            this.service = null;
+            Object.keys(this.proxy).forEach(key => {
+                delete this.proxy[key];
             });
         }
     }
@@ -193,7 +192,7 @@ class Service {
      * @param {Provider} provider
      * @private
      */
-    _socketClose(provider: Provider) {
+    socketClose(provider: Provider) {
         if (provider.retryCount === 1) {
             provider.retryCount += 1;
         } else {
@@ -204,7 +203,7 @@ class Service {
             `${provider.hostname}:${provider.port} ${provider.query.interface}@${provider.query.version}`,
         );
         setTimeout(() => {
-            this._emit('dubbo-socket-retry', provider);
+            this.emit('dubbo-socket-retry', provider);
             provider.socket = new Socket(provider, this);
         }, 1000 * provider.retryCount);
     }
@@ -215,18 +214,18 @@ class Service {
      * @param children
      * @private
      */
-    _merge(service: service, children: UrlWithParsedQuery[]) {
+    merge(service: ServiceDefine, children: UrlWithParsedQuery[]) {
         const newLinks: Provider[] = children.filter(provider => {
-            return this._providers.findIndex(item => item.hostname === provider.hostname && item.port === provider.port) === -1;
+            return this.providers.findIndex(item => item.hostname === provider.hostname && item.port === provider.port) === -1;
         }) as Provider[];
 
-        const removeLinks: Provider[] = this._providers.filter(provider => {
+        const removeLinks: Provider[] = this.providers.filter(provider => {
             return children.findIndex(item => item.hostname === provider.hostname && item.port === provider.port) === -1;
         });
 
 
         removeLinks.forEach(item => {
-            this._closeProviderByHost(item.hostname, item.port);
+            this.closeProviderByHost(item.hostname, item.port);
         });
 
         debug(
@@ -240,22 +239,22 @@ class Service {
             removeLinks.map(item => `${item.hostname}:${item.port} ${item.query.interface}@${item.query.version}`).join()
         );
 
-        debug('service provider 老provider数量', this._providers.length);
-        this._service = service;
+        debug('service provider 老provider数量', this.providers.length);
+        this.service = service;
 
         // 重新生成新的prodiver线程池
-        this._providers = [
-            ...this._providers,
+        this.providers = [
+            ...this.providers,
             // 生成新线程池
             ...newLinks.map((provider: Provider) => {
                 provider.socket = new Socket(provider, this);
                 return provider;
             })
         ];
-        debug('service provider 新provider数量', this._providers.length);
+        debug('service provider 新provider数量', this.providers.length);
 
-        this._injectInvokeProxy();
-        this._emit('dubbo-server-merge', children, this._providers);
+        this.injectInvokeProxy();
+        this.emit('dubbo-server-merge', children, this.providers);
     }
 
 }

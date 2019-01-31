@@ -1,4 +1,4 @@
-/// <reference path="../typings/js-to-java.d.ts" />
+/// <reference path="./js-to-java.d.ts" />
 // dubbo类型
 /**
  * 初始化dubbo服务参数
@@ -6,14 +6,32 @@
 
 import {connectOption} from 'node-zookeeper-client'
 import {UrlWithParsedQuery} from "url";
-import Socket from '../src/socket';
+import Socket from '../src/consumer/socket';
 import java = require('js-to-java');
 import {EventEmitter} from 'events'
+
+
+export class Consumer extends EventEmitter {
+    /**
+     * 代理服务方法
+     */
+    [x: string]: {
+        [x: string]: proxyFunction;
+    } | any;
+
+    /**
+     * 客户端已连接
+     * @param {string} serviceName
+     * @returns {Promise<Consumer>}
+     */
+    ready(serviceName: string): Promise<Consumer>;
+}
+
 
 /**
  * 该参数会透传给 node-zookeeper-client 模块
  */
-export interface DubboOption extends connectOption {
+export interface Option extends connectOption {
     /**
      * dubbo 在zookeeper中注册的根路径
      */
@@ -37,7 +55,9 @@ export interface DubboOption extends connectOption {
     /**
      * 远程dubbo接口interface声明
      */
-    services: services;
+    services: {
+        [x: string]: Service
+    };
 }
 
 export type params = (param: any, java: java) => any;
@@ -46,7 +66,7 @@ export type attachmentsObject = {
     [x: string]: string | number
 };
 
-export interface service {
+export interface Service {
     /**
      * dubbo version 自动赋值
      */
@@ -79,9 +99,6 @@ export interface service {
     }
 }
 
-export interface services {
-    [x: string]: service
-}
 
 export interface Provider extends UrlWithParsedQuery {
     socket: Socket;
@@ -93,25 +110,9 @@ export interface InvokePackage {
     reject: Function,
     method: string;
     args: any[];
-    service: service;
+    service: Service;
     id?: number;
     startInvoke?: Function;
 }
 
 type proxyFunction = (...args: any[]) => Promise<any>
-
-export class DubboClient extends EventEmitter {
-    /**
-     * 代理服务方法
-     */
-    [x: string]: {
-        [x: string]: proxyFunction;
-    } | any;
-
-    /**
-     * 客户端已连接
-     * @param {string} serviceName
-     * @returns {Promise<DubboClient>}
-     */
-    ready(serviceName: string): Promise<DubboClient>;
-}

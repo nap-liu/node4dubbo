@@ -1,14 +1,14 @@
 /**
  * Created by liuxi on 2019/01/18.
  */
-import {InvokePackage, Provider} from "../typings";
+import {InvokePackage, Provider} from "../../typings/consumer";
 import net = require('net');
-import Decode from './decode'
-import Encode from './encode';
+import Decode from '../common/decode'
+import Encode from '../common/encode';
 import Service from './service';
-import Protocol, {MAX_ID} from './protocol';
+import Protocol, {MAX_ID} from '../common/protocol';
 
-const debug = require('debug')('dubbo:client:socket');
+const debug = require('debug')('dubbo:consumer:socket');
 
 const {PROTOCOL_LENGTH} = Protocol;
 
@@ -193,7 +193,7 @@ class Socket {
     clear(noticeParent: boolean = true) {
         if (this.socket) {
             if (noticeParent) {
-                this.service._socketClose(this.provider);
+                this.service.socketClose(this.provider);
             }
             if (!this.socket.destroyed) {
                 this.socket.destroy();

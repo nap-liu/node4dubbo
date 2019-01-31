@@ -1,7 +1,7 @@
 /**
  * Created by liuxi on 2019/01/18.
  */
-import {attachmentsFunction, InvokePackage, Provider} from "../typings";
+import {attachmentsFunction, InvokePackage, Provider} from "../../typings/consumer";
 import Protocol from './protocol';
 
 const Encoder = require('hessian.js').EncoderV2;
