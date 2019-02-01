@@ -37,6 +37,7 @@ declare module 'node-zookeeper-client' {
     exists (path: string, callback: statCallback): void;
 
     getChildren (path: string, watcher: watcherCallback, callback: childrenCallback): void;
+    getChildren (path: string, callback: childrenCallback): void;
 
     getData (path: string, watcher: watcherCallback, callback: childrenCallback): void;
 
