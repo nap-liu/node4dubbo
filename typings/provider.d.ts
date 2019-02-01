@@ -2,12 +2,22 @@
 
 import { EventEmitter } from 'events'
 import { connectOption } from 'node-zookeeper-client'
+import net = require('net')
 
 declare class Provider {
 
 }
 
-export interface Option extends connectOption {
+export class Socket extends net.Socket {
+  buffer: Buffer
+}
+
+export interface zookeeperOption extends connectOption {
+  address: string,
+  path: string
+}
+
+export interface Option {
   /**
    * 应用描述
    */
@@ -22,6 +32,10 @@ export interface Option extends connectOption {
     version?: string,
   },
   /**
+   * dubbo协议版本
+   */
+  version: string,
+  /**
    * 监听ip
    */
   ip: string,
@@ -30,13 +44,17 @@ export interface Option extends connectOption {
    */
   port: number,
   /**
-   * zookeeper 地址
+   * node-zookeeper-client
    */
-  address: string
+  zookeeper: zookeeperOption;
   /**
    * 最大执行队列
    */
   executes?: number,
+  /**
+   * 超时时间
+   */
+  timeout?: number,
   /**
    * 运行环境
    */

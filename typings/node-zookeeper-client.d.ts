@@ -16,7 +16,7 @@ declare module 'node-zookeeper-client' {
   interface Stat {
   }
 
-  export type createCallBack = (error: ClientError, path: string) => void;
+  export type createCallBack = (error: ClientError | Exception, path: string) => void;
   export type watcherCallback = (event: Event) => void;
   export type statCallback = (error: ClientError, stat: Stat) => void;
   export type childrenCallback = (error: ClientError, children: string[], stat: Stat) => void;
@@ -70,32 +70,36 @@ declare module 'node-zookeeper-client' {
   }
 
   export class Exception {
-    OK: number
-    SYSTEM_ERROR: number
-    RUNTIME_INCONSISTENCY: number
-    DATA_INCONSISTENCY: number
-    CONNECTION_LOSS: number
-    MARSHALLING_ERROR: number
-    UNIMPLEMENTED: number
-    OPERATION_TIMEOUT: number
-    BAD_ARGUMENTS: number
-    API_ERROR: number
-    NO_NODE: number
-    NO_AUTH: number
-    BAD_VERSION: number
-    NO_CHILDREN_FOR_EPHEMERALS: number
-    NODE_EXISTS: number
-    NOT_EMPTY: number
-    SESSION_EXPIRED: number
-    INVALID_CALLBACK: number
-    INVALID_ACL: number
-    AUTH_FAILED: number
+    static OK: number
+    static SYSTEM_ERROR: number
+    static RUNTIME_INCONSISTENCY: number
+    static DATA_INCONSISTENCY: number
+    static CONNECTION_LOSS: number
+    static MARSHALLING_ERROR: number
+    static UNIMPLEMENTED: number
+    static OPERATION_TIMEOUT: number
+    static BAD_ARGUMENTS: number
+    static API_ERROR: number
+    static NO_NODE: number
+    static NO_AUTH: number
+    static BAD_VERSION: number
+    static NO_CHILDREN_FOR_EPHEMERALS: number
+    static NODE_EXISTS: number
+    static NOT_EMPTY: number
+    static SESSION_EXPIRED: number
+    static INVALID_CALLBACK: number
+    static INVALID_ACL: number
+    static AUTH_FAILED: number
+
+    code: number
+    name: string
+    path: string
 
     getCode (): number;
 
-    getPath (): string;
-
     getName (): string;
+
+    getPath (): string;
 
     toString (): string;
   }

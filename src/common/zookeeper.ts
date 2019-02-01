@@ -6,6 +6,7 @@ import {
   State,
   Client,
   CreateMode,
+  Exception,
   connectOption,
   childrenCallback
 } from 'node-zookeeper-client'
@@ -39,6 +40,7 @@ class Zookeeper extends EventEmitter {
     }
     this.client = createClient(this.address, this.option)
     this.client.on('state', this.stateChange.bind(this))
+    this.client.connect()
   }
 
   stateChange (state: State) {
@@ -83,9 +85,8 @@ class Zookeeper extends EventEmitter {
    */
   exists (registerPath: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      const dirPath = path.dirname(registerPath)
-      debug('检查注册 zookeeper 根路径是否存在', dirPath)
-      this.client.exists(dirPath, (error, stat) => {
+      debug('检查注册 zookeeper 根路径是否存在', registerPath)
+      this.client.exists(registerPath, (error, stat) => {
         if (error) {
           reject(error)
         } else if (stat) {
@@ -100,20 +101,26 @@ class Zookeeper extends EventEmitter {
   /**
    * 注册指定路径节点 如果客户端掉线则自动移除节点
    * @param registerPath
+   * @param mode
    */
-  createPath (registerPath: string): Promise<void> {
+  createPath (registerPath: string, mode: CreateMode = CreateMode.EPHEMERAL): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.client.create(registerPath, CreateMode.EPHEMERAL, (error, node) => {
+      this.client.create(registerPath, mode, (error, node) => {
         if (error) {
-          reject(error)
-          debug(`createConsumer 注册出错 ${registerPath}`, error)
+          if (error.getCode() === Exception.NODE_EXISTS) {
+            debug(`createPath 注册成功 ${registerPath}`)
+            resolve()
+          } else {
+            debug(`createPath 注册出错 ${registerPath}`, error)
+            reject(error)
+          }
         } else {
           resolve()
-          debug(`createConsumer 注册成功 ${registerPath}`)
+          debug(`createPath 注册成功 ${registerPath}`)
         }
       })
     })
   }
 }
 
-export { Zookeeper }
+export { Zookeeper, CreateMode }

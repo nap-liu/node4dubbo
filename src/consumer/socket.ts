@@ -39,8 +39,6 @@ class Socket {
     this.wait = []
     this.isReady = false
 
-    console.log(provider.query)
-
     // 最大并发数为provider的一半 保证服务不会被瞬间高并发打死 保证服务端能正常相应调用请求
     this.maxExecutes = parseInt(`${+this.provider.query['default.executes'] * .5}`)
 

@@ -4,12 +4,16 @@
 import { ServiceOption } from '../../typings/provider'
 
 class Service {
-  constructor (option: ServiceOption) {
+  option: ServiceOption
+  methods: { [x: string]: Function }
 
+  constructor (option: ServiceOption) {
+    this.option = option
+    this.methods = {}
   }
 
   on (method: string, ...middlewares: Function[]) {
-
+    this.methods[method] = middlewares[0]
   }
 }
 
