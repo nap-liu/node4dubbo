@@ -2,13 +2,12 @@
  * Created by liuxi on 2019/01/18.
  */
 
-
 declare module 'js-to-java' {
-    function java(type: string): any;
+  function java (type: string): any;
 
-    interface java {
+  interface java {
 
-    }
+  }
 
-    export = java
+  export = java
 }

@@ -2,10 +2,7 @@
 /**
  * Created by liuxi on 2019/01/18.
  */
-import {Consumer} from './consumer';
-import {Provider} from './provider';
 
-export {
-    Consumer,
-    Provider
-};
+export { Consumer } from './consumer'
+export { Provider } from './provider'
+export { Service } from './provider/service'
