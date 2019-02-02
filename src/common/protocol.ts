@@ -29,31 +29,36 @@ const RESPONSE_STATUS_CODE = [
 ]
 
 const TYPE_RESPONSE = 0x2
+const TYPE_REQUEST = 0xc2
 
 const MAX_ID = 9223372036854775807
 const MAX_LEN = 1024 * 1024 * 8
 
+const HEART_BEAT_CONSUMER = [
+  ...MAGIC,
+  0xe2, 0,
+  0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0x01,
+  0x4e
+]
+
+const HEART_BEAT_SERVER = [
+  ...MAGIC,
+  0x22,
+  0x14,
+  0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0x01,
+  0x4e
+]
+
 class Protocol {
   static PROTOCOL_LENGTH = 2 + 1 + 1 + 8 + 4
 
-  static HEART_BEAT_SEND = Buffer.from([
-    ...MAGIC,
-    0xe2, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0x01,
-    0x4e
-  ])
+  static HEART_BEAT_CONSUMER = Buffer.from(HEART_BEAT_CONSUMER)
 
-  static HEART_BEAT_RECEIVE = Buffer.from([
-    ...MAGIC,
-    0x22,
-    0x14,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0x01,
-    0x4e
-  ])
+  static HEART_BEAT_SERVER = Buffer.from(HEART_BEAT_SERVER)
 
-  static HEART_BEAT_LENGTH = Protocol.HEART_BEAT_RECEIVE.length
+  static HEART_BEAT_LENGTH = Protocol.HEART_BEAT_CONSUMER.length
 
   static HEADER_INVOKE_RESPONSE = Buffer.from([
     ...MAGIC,
@@ -82,8 +87,8 @@ class Protocol {
   }
 
   static isHeartBeat (data: Buffer) {
-    return data.slice(Protocol.HEART_BEAT_LENGTH).equals(Protocol.HEART_BEAT_RECEIVE) ||
-      data.slice(Protocol.HEART_BEAT_LENGTH).equals(Protocol.HEART_BEAT_SEND)
+    return data.slice(Protocol.HEART_BEAT_LENGTH).equals(Protocol.HEART_BEAT_CONSUMER) ||
+      data.slice(Protocol.HEART_BEAT_LENGTH).equals(Protocol.HEART_BEAT_SERVER)
   }
 
   toBuffer () {
@@ -92,7 +97,11 @@ class Protocol {
 
   isHeartBeat (): boolean {
     const data = this.data.slice(0, Protocol.HEART_BEAT_LENGTH)
-    return data.equals(Protocol.HEART_BEAT_RECEIVE) || data.equals(Protocol.HEART_BEAT_SEND)
+    return data.equals(Protocol.HEART_BEAT_SERVER) || data.equals(Protocol.HEART_BEAT_CONSUMER)
+  }
+
+  isRequest () {
+    return this.getType() === TYPE_REQUEST
   }
 
   isResponse () {

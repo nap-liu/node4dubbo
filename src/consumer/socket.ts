@@ -242,7 +242,7 @@ class Socket {
       if (this.buffer.length) {
         debug('dubbo 当前有活动方法 暂停心跳')
       } else {
-        this.socket.write(Protocol.HEART_BEAT_SEND)
+        this.socket.write(Protocol.HEART_BEAT_CONSUMER)
       }
     }, 1000 * 5)
     this.provider.retryCount = 1

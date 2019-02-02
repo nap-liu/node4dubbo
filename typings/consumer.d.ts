@@ -58,7 +58,7 @@ export interface Option extends connectOption {
   };
 }
 
-export type params = (param: any, java: java) => any;
+export type params = (param: any, java: Function) => any;
 export type attachmentsFunction = (invokePackage: InvokePackage) => any;
 export type attachmentsObject = {
   [x: string]: string | number

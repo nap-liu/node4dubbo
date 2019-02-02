@@ -2,6 +2,7 @@
  * Created by liuxi on 2019/01/31.
  */
 import { ServiceOption } from '../../typings/provider'
+import { compose } from '../common/util'
 
 class Service {
   option: ServiceOption
@@ -12,8 +13,8 @@ class Service {
     this.methods = {}
   }
 
-  on (method: string, ...middlewares: Function[]) {
-    this.methods[method] = middlewares[0]
+  method (name: string, ...middleware: Function[]) {
+    this.methods[name] = compose(...middleware)
   }
 }
 

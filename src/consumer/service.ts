@@ -193,11 +193,11 @@ class Service {
    * @private
    */
   socketClose (provider: Provider) {
-    if (provider.retryCount === 1) {
-      provider.retryCount += 1
-    } else {
-      provider.retryCount *= provider.retryCount
-    }
+    // if (provider.retryCount === 1) {
+    //   provider.retryCount += 1
+    // } else {
+    //   provider.retryCount *= provider.retryCount
+    // }
     debug(
       '线程池socket异常断开 开始重试',
       `${provider.hostname}:${provider.port} ${provider.query.interface}@${provider.query.version}`,

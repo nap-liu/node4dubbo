@@ -2,6 +2,7 @@
  * Created by liuxi on 2019/02/01.
  */
 import os = require('os')
+import { Context } from '../provider/context'
 
 export function isLoopback (addr: string) {
   return (
@@ -22,4 +23,16 @@ export function ip (): string {
       return addresses.length ? addresses[0].address : undefined
     })
     .filter(Boolean)[0]
+}
+
+export function compose (...funcs: Function[]) {
+  return async function (ctx: Context, args: any[]) {
+    let result = null
+    let defaultNext = () => {}
+    for (let i = 0, l = funcs.length; i < l; i++) {
+      const next = i === l ? defaultNext : funcs[i + 1].bind(ctx, args, ctx)
+      result = await funcs[i](args, ctx, next)
+    }
+    return result
+  }
 }

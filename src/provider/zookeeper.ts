@@ -102,11 +102,30 @@ class Zookeeper extends EventEmitter {
       zookeeper
     } = this.option
 
+    const interfaces: { [x: string]: number } = {}
+
+    /**
+     * 相同interface不同版本则自动生成path后缀
+     * @param name
+     */
+    const getInterface = (name: string): string => {
+      let count = interfaces[name]
+      if (count) {
+        count++
+        interfaces[name] = count
+        return name + count
+      } else {
+        interfaces[name] = 1
+        return name
+      }
+    }
+
     this.services.forEach(async service => {
       const query = this.createQuery(service)
       const { interface: _interface } = service.option
       // const provider = `dubbo://ip:port/path?query`
-      const provider = `dubbo://${ip()}:${port}/${_interface}?${query}`
+      const provider = `dubbo://${ip()}:${port}/${getInterface(_interface)}?${query}`
+
       const registryPath = `/${zookeeper.path}/${_interface}/providers/${encodeURIComponent(provider)}`
       debug('zookeeper 注册provider', registryPath)
       this.createPath(registryPath)
@@ -127,6 +146,10 @@ class Zookeeper extends EventEmitter {
         const paths = basePath.split('/').filter(i => i)
         for (let i = 1, length = paths.length; i <= length; i++) {
           debug('zookeeper 创建根节点', paths.slice(0, i).join('/'))
+          /**
+           * ps: zookeeper 临时节点不允许创建子节点 所以有子节点的父节点都只能创建固定节点
+           * pps: 后期可能会增加清理api 专门清理zookeeper节点污染的问题
+           */
           await this.client.createPath('/' + paths.slice(0, i).join('/'), common.CreateMode.PERSISTENT)
         }
         await this.client.createPath(`/${paths.slice(0, paths.length - 1).join('/')}/consumers`, common.CreateMode.PERSISTENT)
