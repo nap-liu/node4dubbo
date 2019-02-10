@@ -6,3 +6,4 @@
 export { Consumer } from './consumer'
 export { Provider } from './provider'
 export { Service } from './provider/service'
+export * from './provider/exception'

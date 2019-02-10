@@ -109,7 +109,7 @@ class Server extends EventEmitter {
       return
     }
 
-    const context = new Context(socket, data.slice(0, PROTOCOL_LENGTH + length))
+    const context = new Context(socket, data.slice(0, PROTOCOL_LENGTH + length), proto)
 
     context.decode(() => {
       this.emit('invoke', context)

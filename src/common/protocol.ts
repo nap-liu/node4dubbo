@@ -60,6 +60,10 @@ class Protocol {
 
   static HEART_BEAT_LENGTH = Protocol.HEART_BEAT_CONSUMER.length
 
+  static RESPONSE_WITH_EXCEPTION = 0
+  static RESPONSE_VALUE = 1
+  static RESPONSE_NULL_VALUE = 2
+
   static HEADER_INVOKE_RESPONSE = Buffer.from([
     ...MAGIC,
     0x02,
@@ -115,8 +119,16 @@ class Protocol {
     return this.data[2]
   }
 
+  setType (data: number) {
+    this.data[2] = data
+  }
+
   getStatus () {
     return this.data[3]
+  }
+
+  setStatus (data: number) {
+    this.data[3] = data
   }
 
   getBodyLength () {

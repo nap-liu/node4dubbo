@@ -18,13 +18,14 @@ class Decode {
 
   readResult (cb: Function) {
     const { data } = this
+    const proto = new Protocol(data)
     const result = new Decoder(data.slice(16, data.length))
-    if (data[3] !== Protocol.RESPONSE_STATUS.OK) {
-      return cb(result.readString())
+    if (proto.getStatus() !== Protocol.RESPONSE_STATUS.OK) {
+      const exception = result.read()
+      return cb(exception)
     }
     try {
       const flag = result.readInt()
-
       switch (flag) {
         case RESPONSE_NULL_VALUE:
           cb(null, null)
