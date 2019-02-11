@@ -9,6 +9,18 @@ class Service {
   methods: { [x: string]: Function }
 
   constructor (option: ServiceOption) {
+    if (!option) {
+      throw new Error('option 不能为空')
+    }
+
+    if (!option.interface) {
+      throw new Error('option.interface 不能为空')
+    }
+
+    if (!option.version) {
+      throw new Error('option.version 不能为空')
+    }
+
     this.option = option
     this.methods = {}
   }

@@ -12,6 +12,8 @@ import path = require('path')
 
 const debug = require('debug')('dubbo:provider:zookeeper')
 
+const interfaces: { [x: string]: number } = {}
+
 class Zookeeper extends EventEmitter {
   client: common.Zookeeper
   option: Option
@@ -23,7 +25,7 @@ class Zookeeper extends EventEmitter {
   }
 
   connect () {
-    const { zookeeper } = this.option
+    const {zookeeper} = this.option
     debug('开始连接zookeeper', zookeeper.address)
     this.client = new common.Zookeeper(zookeeper.address, zookeeper)
     this.client.on('state', this.state.bind(this))
@@ -72,7 +74,7 @@ class Zookeeper extends EventEmitter {
       methods
     } = service
 
-    const { interface: _interface, version } = option
+    const {interface: _interface, version} = option
 
     const query = {
       anyhost: true,
@@ -101,9 +103,6 @@ class Zookeeper extends EventEmitter {
       port,
       zookeeper
     } = this.option
-
-    const interfaces: { [x: string]: number } = {}
-
     /**
      * 相同interface不同版本则自动生成path后缀
      * @param name
@@ -122,7 +121,7 @@ class Zookeeper extends EventEmitter {
 
     this.services.forEach(async service => {
       const query = this.createQuery(service)
-      const { interface: _interface } = service.option
+      const {interface: _interface} = service.option
       // const provider = `dubbo://ip:port/path?query`
       const provider = `dubbo://${ip()}:${port}/${getInterface(_interface)}?${query}`
 

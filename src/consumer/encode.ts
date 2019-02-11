@@ -2,7 +2,7 @@
  * Created by liuxi on 2019/01/18.
  */
 import { attachmentsFunction, InvokePackage, Provider } from '../../typings/consumer'
-import { Protocol } from './protocol'
+import { Protocol } from '../common/protocol'
 
 const Encoder = require('hessian.js').EncoderV2
 
@@ -24,7 +24,7 @@ class Encode {
   }
 
   body (): Buffer {
-    const { method, args, service } = this.invoke
+    const {method, args, service} = this.invoke
     const body = new Encoder()
     body.write(service.dubboVersion)
 
@@ -43,12 +43,12 @@ class Encode {
       }
     }
     body.write(this.attachments())
-    return body.byteBuffer._bytes.slice(0, body.byteBuffer._offset)
+    return body.get()
   }
 
   attachments (): object {
-    const { pathname, query } = this.provider
-    const { interface: _interface, version, group, token, attachments } = this.invoke.service
+    const {pathname, query} = this.provider
+    const {interface: _interface, version, group, token, attachments} = this.invoke.service
 
     const implicitArgs: { [x: string]: string } = {
       interface: _interface,

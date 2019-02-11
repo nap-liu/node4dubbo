@@ -11,16 +11,15 @@ import { Protocol } from '../common/protocol'
 import { Socket } from '../../typings/provider'
 import {
   BadRequest,
-  BadResponse,
-  ClientError,
-  ClientTimeout,
   ServerError,
   ServerTimeout,
   ServiceError,
   ServiceNotFound
 } from './exception'
 
-const { PROTOCOL_LENGTH } = Protocol
+const debug = require('debug')('dubbo:consumer:context')
+
+const {PROTOCOL_LENGTH} = Protocol
 
 class Context {
   buffer: Buffer
@@ -74,13 +73,25 @@ class Context {
     }
   }
 
+  clear () {
+    this.buffer = null
+    this.socket = null
+    this.interface = null
+    this.version = null
+    this.method = null
+    this.args = null
+    this.attachments = null
+    this.request = null
+    this.result = null
+  }
+
   response = () => {
-    const { result } = this
+    const {result} = this
     const encode = new Encoder()
     const proto = new Protocol(
       Buffer.concat([
         Buffer.from(Protocol.HEADER_INVOKE_RESPONSE),
-        Buffer.from(Array.from({ length: PROTOCOL_LENGTH - 4 }))
+        Buffer.from(Array.from({length: PROTOCOL_LENGTH - 4}))
       ])
     )
 
@@ -114,7 +125,16 @@ class Context {
 
     const buffer = encode.get()
     proto.setBodyLength(buffer.length)
-    this.socket.write(Buffer.concat([proto.toBuffer(), buffer]))
+    let retry = 0
+    while (!this.socket.write(Buffer.concat([proto.toBuffer(), buffer]))) {
+      debug('写入回执失败')
+      retry++
+      if (retry > 10) {
+        debug('写入重试10次依旧失败 不再重试', this.method, this.args, this.result)
+        break
+      }
+    }
+    this.clear()
   }
 }
 

@@ -70,7 +70,7 @@ class Service {
   injectInvokeProxy () {
     const allMethods: Map<string, Provider> = new Map()
     this.providers.forEach(provider => {
-      const { methods } = provider.query;
+      const {methods} = provider.query;
       (methods as string).split(',').forEach((item: string) => {
         allMethods.set(item, provider)
       })
@@ -89,8 +89,8 @@ class Service {
    */
   invoke (method: string, provider: Provider) {
     return (...args: any[]) => {
-      const { service } = this
-      const { methods } = service
+      const {service} = this
+      const {methods} = service
       if (methods && methods[method] && methods[method].length) {
         args = args.map((param, index) => {
           const func = methods[method][index] || (param => param)
@@ -137,9 +137,12 @@ class Service {
    */
   getProvider (callback: Function) {
     if (this.providers.length) {
-      callback(this.providers[this.index++])
-      if (this.index >= this.providers.length) {
+      const provider = this.providers[this.index++]
+      if (provider) {
+        callback(provider)
+      } else {
         this.index = 0
+        this.getProvider(callback)
       }
     } else {
       throw new Error(`interface ${this.service.interface} 没有提供 provider`)
@@ -148,16 +151,15 @@ class Service {
 
   /**
    * 删除指定socket连接池
-   * @param {string} host
-   * @param {string} port
+   * @param {Provider} provider
    * @private
    */
-  closeProviderByHost (host: string, port: string) {
+  closeProvider (provider: Provider) {
     if (Array.isArray(this.providers)) {
       const dels: number[] = []
 
       this.providers.forEach((item: Provider, index: number) => {
-        if (item.hostname === host && item.port === port) {
+        if (item === provider) {
           item.socket.clear(false)
           dels.push(index)
         }
@@ -193,14 +195,14 @@ class Service {
    * @private
    */
   socketClose (provider: Provider) {
-    // if (provider.retryCount === 1) {
-    //   provider.retryCount += 1
-    // } else {
-    //   provider.retryCount *= provider.retryCount
-    // }
+    if (provider.retryCount === 1) {
+      provider.retryCount += 1
+    } else {
+      provider.retryCount *= provider.retryCount
+    }
     debug(
       '线程池socket异常断开 开始重试',
-      `${provider.hostname}:${provider.port} ${provider.query.interface}@${provider.query.version}`,
+      `${provider.hostname}:${provider.port} ${provider.query.interface}@${provider.query.version}`
     )
     setTimeout(() => {
       this.emit('dubbo-socket-retry', provider)
@@ -216,26 +218,35 @@ class Service {
    */
   merge (service: ServiceDefine, children: UrlWithParsedQuery[]) {
     const newLinks: Provider[] = children.filter(provider => {
-      return this.providers.findIndex(item => item.hostname === provider.hostname && item.port === provider.port) === -1
+      return this.providers.findIndex(item =>
+        item.hostname === provider.hostname &&
+        item.port === provider.port &&
+        item.query.pid === provider.query.pid
+      ) === -1
+
     }) as Provider[]
 
     const removeLinks: Provider[] = this.providers.filter(provider => {
-      return children.findIndex(item => item.hostname === provider.hostname && item.port === provider.port) === -1
+      return children.findIndex(item =>
+        item.hostname === provider.hostname &&
+        item.port === provider.port &&
+        item.query.pid === provider.query.pid
+      ) === -1
     })
 
     removeLinks.forEach(item => {
-      this.closeProviderByHost(item.hostname, item.port)
+      this.closeProvider(item)
     })
 
     debug(
       'service provider 变化 diff 新老 provider 新建provider',
       newLinks.length,
-      newLinks.map(item => `${item.hostname}:${item.port} ${item.query.interface}@${item.query.version}`).join()
+      newLinks.map(item => `${item.hostname}:${item.port}:${item.query.pid} ${item.query.interface}@${item.query.version}`).join()
     )
     debug(
       'service provider 变化 diff 新老 provider 移除provider',
       removeLinks.length,
-      removeLinks.map(item => `${item.hostname}:${item.port} ${item.query.interface}@${item.query.version}`).join()
+      removeLinks.map(item => `${item.hostname}:${item.port}:${item.query.pid} ${item.query.interface}@${item.query.version}`).join()
     )
 
     debug('service provider 老provider数量', this.providers.length)

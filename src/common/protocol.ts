@@ -4,7 +4,7 @@
 
 const MAGIC = [0xda, 0xbb]
 
-const RESPONSE_STATUS = {
+const RESPONSE_STATUS: { [x: string]: number } = {
   OK: 0x14,
   CLIENT_TIMEOUT: 0x1e,
   SERVER_TIMEOUT: 0x1f,
@@ -16,17 +16,7 @@ const RESPONSE_STATUS = {
   CLIENT_ERROR: 0x5a
 }
 
-const RESPONSE_STATUS_CODE = [
-  0x14,
-  0x1e,
-  0x1f,
-  0x28,
-  0x32,
-  0x3c,
-  0x46,
-  0x50,
-  0x5a
-]
+const RESPONSE_STATUS_CODE = Object.keys(RESPONSE_STATUS).map(k => RESPONSE_STATUS[k])
 
 const TYPE_RESPONSE = 0x2
 const TYPE_REQUEST = 0xc2
@@ -67,7 +57,7 @@ class Protocol {
   static HEADER_INVOKE_RESPONSE = Buffer.from([
     ...MAGIC,
     0x02,
-    0x14,
+    0x14
   ])
 
   static HEADER_INVOKE = Buffer.from([

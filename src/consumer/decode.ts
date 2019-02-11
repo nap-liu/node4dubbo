@@ -1,7 +1,7 @@
 /**
  * Created by liuxi on 2019/01/18.
  */
-import { Protocol } from './protocol'
+import { Protocol } from '../common/protocol'
 
 const Decoder = require('hessian.js').DecoderV2
 

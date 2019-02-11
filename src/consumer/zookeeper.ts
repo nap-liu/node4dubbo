@@ -39,7 +39,7 @@ class Zookeeper {
   }
 
   connect () {
-    const { option } = this
+    const {option} = this
     debug('开始连接zk服务器', option.address, option.path)
     if (this.client) {
       debug('丢弃已经存在的zk客户端')
@@ -107,32 +107,24 @@ class Zookeeper {
   }
 
   getChildren () {
-    const { path, services } = this.option
+    const {path, services} = this.option
     Object.keys(services).forEach(serviceName => {
       const service = services[serviceName]
-      const { interface: _interface } = service
-      this.client.getChildren(`/${path}/${_interface}/providers`, this.getChildrenWatcher.bind(this, service, serviceName), this.getChildrenCallback.bind(this, service, serviceName))
+      const {interface: _interface} = service
+      const providerPath = `/${path}/${_interface}/providers`
+      this.client.getChildren(providerPath, this.getChildrenWatcher.bind(this, service, serviceName, providerPath), this.getChildrenCallback.bind(this, service, serviceName))
     })
   }
 
-  getChildrenWatcher (service: Service, serviceName: string, event: Event) {
+  getChildrenWatcher (service: Service, serviceName: string, path: string, event: Event) {
     debug('zk watcher 服务节点改变')
     this.emit('zookeeper-node-change', {
+      path,
       service,
       serviceName,
       event
     })
-    // switch (event) {
-    //     case Event.NODE_CREATED:
-    //
-    //         break;
-    //     case Event.NODE_DELETED:
-    //
-    //         break;
-    //     case Event.NODE_CHILDREN_CHANGED:
-    //         this.parent.emit('zookeeper-change', event);
-    //         break;
-    // }
+    this.client.getChildren(path, this.getChildrenWatcher.bind(this, service, serviceName, path), this.getChildrenCallback.bind(this, service, serviceName))
   }
 
   getChildrenCallback (service: Service, serviceName: string, error: ClientError, children: string[]) {
@@ -168,14 +160,12 @@ function isLoopback (addr: string) {
 
 function ip (): string {
   const interfaces = os.networkInterfaces()
-  return Object.keys(interfaces)
-    .map(function (nic) {
-      const addresses = interfaces[nic].filter(function (details) {
-        return details.family.toLowerCase() === 'ipv4' && !isLoopback(details.address)
-      })
-      return addresses.length ? addresses[0].address : undefined
+  return Object.keys(interfaces).map(function (nic) {
+    const addresses = interfaces[nic].filter(function (details) {
+      return details.family.toLowerCase() === 'ipv4' && !isLoopback(details.address)
     })
-    .filter(Boolean)[0]
+    return addresses.length ? addresses[0].address : undefined
+  }).filter(Boolean)[0]
 }
 
 class ZookeeperConsumer {
@@ -193,7 +183,7 @@ class ZookeeperConsumer {
   }
 
   createPath (service: Service) {
-    const { option } = this
+    const {option} = this
     const info: UrlObject = {
       protocol: 'consumer',
       slashes: true,

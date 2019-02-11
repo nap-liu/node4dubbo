@@ -9,7 +9,7 @@ import { Protocol } from '../common/protocol'
 
 const debug = require('debug')('dubbo:provider:server')
 
-const { PROTOCOL_LENGTH, HEART_BEAT_SERVER } = Protocol
+const {PROTOCOL_LENGTH, HEART_BEAT_SERVER} = Protocol
 
 class Server extends EventEmitter {
   ip: string
@@ -36,9 +36,7 @@ class Server extends EventEmitter {
   serverConnection (socket: Socket) {
     debug(`consumer 连接 ${socket.remoteAddress}:${socket.remotePort}`)
     socket.buffer = Buffer.from([])
-    socket.on('connect', this.clientConnect.bind(this, socket))
     socket.on('data', this.clientData.bind(this, socket))
-    socket.on('end', this.clientEnd.bind(this, socket))
     socket.on('error', this.clientError.bind(this, socket))
     socket.on('close', this.clientClose.bind(this, socket))
   }
@@ -52,28 +50,19 @@ class Server extends EventEmitter {
   }
 
   ///////////socket//////////
-  clientConnect (socket: Socket) {
-    debug('server consumer socket连接')
-  }
-
   clientData (socket: Socket, data: Buffer) {
     socket.buffer = Buffer.concat([socket.buffer, data])
     this.decodeBuffer(socket)
   }
 
-  clientEnd (socket: net.Socket) {
-    debug('server consumer socket关闭')
-
-  }
-
   clientError (socket: Socket, error: Error) {
     debug('server consumer socket 错误', error)
-
+    socket.buffer = null
   }
 
   clientClose (socket: Socket, hasError: boolean) {
     debug('server consumer socket 关闭', hasError)
-
+    socket.buffer = null
   }
 
   ///////////////decode///////////////////
@@ -81,11 +70,13 @@ class Server extends EventEmitter {
     const data = socket.buffer
     if (data.length < PROTOCOL_LENGTH) {
       debug('server consumer 数据包太小缓存', data.length)
+      return
     }
     const proto = new Protocol(data)
     const length = proto.getBodyLength()
     if (data.length < length + PROTOCOL_LENGTH) {
       debug('server consumer 半包数据缓存', length)
+      return
     }
 
     if (proto.isHeartBeat()) {
@@ -116,6 +107,9 @@ class Server extends EventEmitter {
     })
 
     socket.buffer = socket.buffer.slice(PROTOCOL_LENGTH + length)
+    if (socket.buffer.length) {
+      this.decodeBuffer(socket)
+    }
   }
 }
 

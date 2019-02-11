@@ -4,6 +4,7 @@
 import os = require('os')
 import { Context } from '../provider/context'
 import java = require('js-to-java')
+import { ServiceError } from '..'
 
 export function isLoopback (addr: string) {
   return (
@@ -16,28 +17,46 @@ export function isLoopback (addr: string) {
 
 export function ip (): string {
   const interfaces = os.networkInterfaces()
-  return Object.keys(interfaces)
-    .map(function (nic) {
-      const addresses = interfaces[nic].filter(function (details) {
-        return details.family.toLowerCase() === 'ipv4' && !isLoopback(details.address)
-      })
-      return addresses.length ? addresses[0].address : undefined
+  return Object.keys(interfaces).map(function (nic) {
+    const addresses = interfaces[nic].filter(function (details) {
+      return details.family.toLowerCase() === 'ipv4' && !isLoopback(details.address)
     })
-    .filter(Boolean)[0]
+    return addresses.length ? addresses[0].address : undefined
+  }).filter(Boolean)[0]
 }
 
+/**
+ * 中间件合并函数
+ * @param {Function} functions
+ * @returns {(context: Context, next?: Function) => Promise<void> | Promise<any> | Promise<never>}
+ */
 export function compose (...functions: Function[]) {
-  function dispatch (index: number, ctx?: Context) {
-    return async (context: Context) => {
-      let fn: Function
-      if (index === functions.length - 1) {
-        fn = functions[index].bind(this, ctx || context, async () => {})
-      } else {
-        fn = functions[index].bind(this, ctx || context, dispatch(index + 1, ctx || context))
-      }
-      return fn(java)
-    }
-  }
+  if (!Array.isArray(functions)) throw new Error('中间件调用栈必须是数组')
+  for (let i in functions) if (typeof functions[i] !== 'function') new Error('中间件必须是函数')
+  return (context: Context, next?: Function) => {
+    let index = -1
 
-  return dispatch(0)
+    function dispatch (i: number) {
+      if (i <= index) {
+        throw new ServiceError('中间件不能重复调用')
+      }
+      index = i
+      let fn = functions[i]
+      if (i === functions.length) {
+        fn = next
+      }
+
+      if (!fn) {
+        return Promise.resolve()
+      }
+
+      try {
+        return Promise.resolve(fn(context, dispatch.bind(null, i + 1), java))
+      } catch (e) {
+        return Promise.reject(e)
+      }
+    }
+
+    return dispatch(0)
+  }
 }

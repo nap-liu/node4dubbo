@@ -8,9 +8,13 @@ import { Server } from './server'
 import * as _ from 'lodash'
 import { Context } from './context'
 import { compose } from '../common/util'
-import { ServiceNotFound } from './exception'
+import { ServerTimeout, ServiceError, ServiceNotFound } from './exception'
 
 const debug = require('debug')('dubbo:provider:index')
+
+const getNotFoundErrorInfo = (ctx: Context, services: Service[]) => `${ctx.interface}#${ctx.method}@${ctx.version} in [${services.map(s => s.option.interface)}]`
+
+const getTimeoutErrorInfo = (ctx: Context) => `${ctx.interface}#${ctx.method}@${ctx.version}`
 
 class Provider extends Zookeeper {
   services: Service[]
@@ -22,9 +26,37 @@ class Provider extends Zookeeper {
     super(option)
     this.services = []
     this.middleware = []
+
+    if (!option) {
+      throw new Error('option 不能为空')
+    }
+
+    if (!option.application) {
+      throw new Error('option.application 不能为空')
+    }
+
+    if (!option.application.name) {
+      throw new Error('option.application.name 不能为空')
+    }
+
+    if (!option.zookeeper) {
+      throw new Error('option.zookeeper 不能为空')
+    }
+
+    if (!option.zookeeper.address) {
+      throw new Error('option.zookeeper.address 不能为空')
+    }
+
+    if (!option.zookeeper.path) {
+      throw new Error('option.zookeeper.path 不能为空')
+    }
+
     this.option = _.merge({
       executes: 1000,
       version: '2.5.3.6',
+      ip: '0.0.0.0',
+      port: 20880,
+      timeout: 1000 * 5,
       zookeeper: {
         sessionTimeout: 30000,
         spinDelay: 1000,
@@ -49,13 +81,21 @@ class Provider extends Zookeeper {
       const fn = service.methods[context.method]
       if (typeof fn === 'function') {
         const fns = compose(...this.middleware, fn)
-        fns(context).then(context.response).catch(context.response)
+        Promise.race([
+          fns(context),
+          new Promise((resolve, reject) => {
+            setTimeout(reject, this.option.timeout, new ServerTimeout(`调用服务超时 ${getTimeoutErrorInfo(context)}`))
+          })
+        ]).then(context.response).catch((e) => {
+          context.result = e
+          context.response()
+        })
       } else {
-        context.result = new ServiceNotFound(`调用服务不存在 ${context.interface}#${context.method}@${context.version} in [${this.services.map(s => s.option.interface)}]`)
+        context.result = new ServiceNotFound(`调用服务不存在 ${getNotFoundErrorInfo(context, this.services)}`)
         context.response()
       }
     } else {
-      context.result = new ServiceNotFound(`调用服务不存在 ${context.interface}#${context.method}@${context.version} in [${this.services.map(s => s.option.interface)}]`)
+      context.result = new ServiceNotFound(`调用服务不存在 ${getNotFoundErrorInfo(context, this.services)}`)
       context.response()
     }
   }

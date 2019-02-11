@@ -3,14 +3,14 @@
  */
 import { InvokePackage, Provider } from '../../typings/consumer'
 import net = require('net')
-import { Decode } from '../common/decode'
-import { Encode } from '../common/encode'
+import { Decode } from './decode'
+import { Encode } from './encode'
 import { Service } from './service'
 import { Protocol, MAX_ID } from '../common/protocol'
 
 const debug = require('debug')('dubbo:consumer:socket')
 
-const { PROTOCOL_LENGTH } = Protocol
+const {PROTOCOL_LENGTH} = Protocol
 
 class Socket {
   socket: net.Socket
@@ -28,7 +28,7 @@ class Socket {
   maxExecutes: number
 
   constructor (provider: Provider, service: Service) {
-    const { hostname, port } = provider
+    const {hostname, port} = provider
 
     this.provider = provider
     this.service = service
