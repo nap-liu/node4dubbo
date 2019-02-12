@@ -30,12 +30,16 @@
 **附加库**
 * [js-to-java](https://www.npmjs.com/package/js-to-java) 数据转换库
 
-#### 模块特性
+#### Consumer 特性
   * 本地api `Promise`形式接口调用 自动维护超时时间
   * 点对点`socket`连接 内部自动维护`socket`连接池
   * 自动维护`zookeeper`连接状态
   * `event` 形式通知内部状态
   * `ready` 方法等待`dubbo`初始化完成
+
+#### Provider 特性
+  * koa2形式服务开发
+  * 自动转换数据格式
 
 ---
 
