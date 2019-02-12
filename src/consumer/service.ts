@@ -91,11 +91,15 @@ class Service {
     return (...args: any[]) => {
       const {service} = this
       const {methods} = service
-      if (methods && methods[method] && methods[method].length) {
-        args = args.map((param, index) => {
-          const func = methods[method][index] || (param => param)
-          return func(param, java)
-        })
+      if (methods && methods[method]) {
+        if (methods[method].length === args.length) {
+          args = args.map((param, index) => {
+            const func = methods[method][index] || (param => param)
+            return func(param, java)
+          })
+        } else {
+          throw new Error(`参数错误：${service.interface}.${method} 声明参数为 ${methods[method].length} 个 实际传递为 ${args.length}`)
+        }
       }
       return new Promise(async (resolve, reject) => {
         this.getProvider((provider: Provider) => {

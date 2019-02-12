@@ -107,6 +107,12 @@ class Provider extends Zookeeper {
       debug('开始启动 zookeeper')
       this.connect()
       this.server.on('invoke', this.invoke.bind(this))
+      this.server.on('error', this.emit.bind(this, 'error'))
+      this.server.on('close', this.emit.bind(this, 'close'))
+
+      if (typeof ready === 'function') {
+        ready(this)
+      }
     })
   }
 }

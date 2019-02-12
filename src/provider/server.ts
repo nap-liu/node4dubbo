@@ -43,10 +43,12 @@ class Server extends EventEmitter {
 
   serverClose () {
     debug('server 关闭')
+    this.emit('close')
   }
 
   serverError (error: Error) {
     debug('server 错误', error)
+    this.emit('error', error)
   }
 
   ///////////socket//////////
