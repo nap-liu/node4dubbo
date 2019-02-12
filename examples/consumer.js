@@ -30,7 +30,7 @@ dubbo.ready().then(async dubbo => {
   const start = Date.now()
   const results = await Promise.all(
     Array.from({length: 1000 * 10}).map(async (_, i) => {
-      return dubbo.Remote.fun1(1)
+      return dubbo.Remote.fun1(i)
     }))
   console.log(results, (Date.now() - start), (Date.now() - start) / 1000 / 10)
 })
