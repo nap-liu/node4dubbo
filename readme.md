@@ -43,15 +43,15 @@
 + [例子](#例子)
 + [文档](#文档)
     + [new Consumer](#Consumer)
-        + [ready](#ready(servicename?:-string))
+        + [ready](#ready)
         + [event](#consumer-event)
     + [new Provider](#Provider)
         + [addService](#addservice)
         + [use](#use)
-        + [start](#start(callback?:-function))
+        + [start](#start)
         + [event](#provider-event)
     + [new Service](#Service)
-        + [method](#method(name:-string,-...functions:-function[]))
+        + [method](#method)
     + [Context](#Context)
         
  
@@ -158,7 +158,7 @@ dubbo.remote.fun1('arg1').then(res => {
 
 ---
 
-#### ready(serviceName?: string)
+#### <span id="ready">ready(serviceName?: string)</span>
 
 很多场景需要启动就调用某个函数 所以提供了此函数
 
@@ -366,7 +366,7 @@ app.use(async (ctx, next)=>{
 })
 ```
 
-#### start(callback?: Function)
+#### <span id="start">start(callback?: Function)</span>
 服务启动完成回调
 
 **参数**
@@ -403,7 +403,7 @@ const service = new Service({
 })
 ```
 
-#### method(name: string, ...functions: Function[])
+#### <span id="method">method(name: string, ...functions: Function[])</span>
 向外公开方法
 
 **参数**
