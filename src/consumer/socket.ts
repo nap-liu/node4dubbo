@@ -82,24 +82,18 @@ class Socket {
       this.tasks[this.id] = invokePackage
       const params = new Encode(invokePackage, this.provider)
       const buffer = params.toBuffer()
-      let retry = 0
-      try {
-        while (this.socket.write(buffer) === false) {
-          debug(`socket 写缓冲区失败 ${invokePackage.id}`)
-          if (retry >= 5) {
-            throw new Error('socket 写入失败')
-          }
-          retry++
-        }
-      } catch (e) {
-        reject(e)
-        this.taskCount++
-        this.id++
-        return
-      }
-
       this.taskCount++
       this.id++
+      let retry = 0
+
+      while (this.socket.write(buffer) === false) {
+        debug(`socket 写缓冲区失败 ${invokePackage.id}`)
+        if (retry >= 5) {
+          throw new Error('socket 写入失败')
+        }
+        retry++
+      }
+
       resolve()
     })
   }

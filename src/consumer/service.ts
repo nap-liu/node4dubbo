@@ -128,7 +128,7 @@ class Service {
               }
               provider.socket.cancel(invoker)
             }, +provider.query['default.timeout'] || 1000 * 5)
-          })
+          }).catch(reject)
         })
       })
     }
