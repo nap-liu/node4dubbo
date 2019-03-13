@@ -52,7 +52,7 @@ class Socket {
   }
 
   invoke (invokePackage: InvokePackage): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       if (!this.provider) {
         debug('当前provider 不可用')
         return
@@ -82,9 +82,22 @@ class Socket {
       this.tasks[this.id] = invokePackage
       const params = new Encode(invokePackage, this.provider)
       const buffer = params.toBuffer()
-      while (this.socket.write(buffer) === false) {
-        debug(`socket 写缓冲区失败 ${invokePackage.id}`)
+      let retry = 0
+      try {
+        while (this.socket.write(buffer) === false) {
+          debug(`socket 写缓冲区失败 ${invokePackage.id}`)
+          if (retry >= 5) {
+            throw new Error('socket 写入失败')
+          }
+          retry++
+        }
+      } catch (e) {
+        reject(e)
+        this.taskCount++
+        this.id++
+        return
       }
+
       this.taskCount++
       this.id++
       resolve()
