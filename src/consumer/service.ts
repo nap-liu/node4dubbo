@@ -99,7 +99,8 @@ class Service {
               return func(param, java)
             })
           } else {
-            throw new Error(`参数错误：${service.interface}.${method} 声明参数为 ${methods[method].length} 个 实际传递为 ${args.length}`)
+            reject(new Error(`参数错误：${service.interface}.${method} 声明参数为 ${methods[method].length} 个 实际传递为 ${args.length}`))
+            return
           }
         }
         this.getProvider((provider: Provider) => {
