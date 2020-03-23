@@ -51,11 +51,39 @@ export interface Option extends connectOption {
   address: string,
 
   /**
+   * 筛选使用的provider
+   * @param service 当前服务
+   * @param provider 所有存在的服务
+   */
+  providerFilter?: (service: Service, provider: IProvider) => boolean;
+  /**
    * 远程dubbo接口interface声明
    */
   services: {
     [x: string]: Service
   };
+}
+
+export interface IProvider {
+  anyhost: string;
+  application: string;
+  'application.version': string;
+  'default.executes': string;
+  'default.threads': string;
+  'default.timeout': string;
+  dubbo: string;
+  environment: string;
+  interface: string;
+  logger: string;
+  methods: string;
+  organization: string;
+  owner: string;
+  pid: string;
+  profile: string;
+  revision: string;
+  side: string;
+  timestamp: string;
+  version: string;
 }
 
 export type params = (param: any, java: Function) => any;

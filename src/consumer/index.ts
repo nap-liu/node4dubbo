@@ -7,7 +7,7 @@ import * as _ from 'lodash'
 
 const debug = require('debug')('dubbo:consumer:index')
 
-import { Option, Service as ServiceDefine } from '../../typings/consumer'
+import { IProvider, Option, Service as ServiceDefine } from '../../typings/consumer'
 import { Zookeeper, ZookeeperConsumer } from './zookeeper'
 import { Service } from './service'
 import { UrlWithParsedQuery } from 'url'
@@ -26,6 +26,12 @@ class Consumer extends EventEmitter {
     }
   }
   proxy: any
+
+  static default (baseOption: Option) {
+    return function ConsumerFactory (option: Option) {
+      return new Consumer(_.merge({}, baseOption, option))
+    }
+  }
 
   constructor (option: Option) {
     super()
@@ -80,14 +86,18 @@ class Consumer extends EventEmitter {
   }
 
   providerReady (serviceName: string, service: ServiceDefine, providers: UrlWithParsedQuery[]) {
-    debug('找到 provider', providers.map(item => `${item.hostname}:${item.port} ${item.query.interface}@${item.query.version}`).join())
+    debug('找到 provider', providers.map(item => `${item.hostname}:${item.port} ${item.query.interface}@${item.query.version} version: ${item.query.dubbo} profile: ${item.query.profile} env: ${item.query.environment}`).join('|'))
     service.dubboVersion = this.option.version
+    const {providerFilter = () => true} = this.option
 
     const matchedProviders = providers.filter(provider => {
+      const result = providerFilter(service, provider.query as any as IProvider)
       return (
         provider.query.group === service.group &&
         provider.query.version === service.version &&
-        provider.protocol === 'dubbo:'
+        provider.protocol === 'dubbo:' &&
+        provider.query.dubbo === service.dubboVersion &&
+        (result === true || result === undefined)
       )
     })
 

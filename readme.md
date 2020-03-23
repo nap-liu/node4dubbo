@@ -3,6 +3,10 @@
 该模块参考了 [node-zookeeper-dubbo](https://www.npmjs.com/package/node-zookeeper-dubbo) 模块
 
 **CHANGE.LOG**
+* 2020-03-23
+  * 增加consumer 默认参数用于提前构造公用参数
+  * 增加针对provider注册参数过滤特定provider能力
+  * 增加dubbo版本强制匹配限制
 
 * 2019-02-11
   * 增加provider能力 用于给外部提供服务
@@ -13,7 +17,7 @@
   * 限制对单provider最大并发数为总并发数的一半
   * 修复兜底超时回调可能会导致并发数错误问题
   * 修复超时回调可能访问异常的问题
-  
+
 
 * 2019-01-29
   * 修复调用异常错误处理超时
@@ -23,7 +27,7 @@
   * 修复socket关闭后回调访问属性出错
   * 修改解码流程
 
-* 2019-01-25 
+* 2019-01-25
   * 修改默认连接池数量为 2
   * 重构调用策略同等数量调用，效率提升了4倍左右
 
@@ -57,8 +61,8 @@
     + [new Service](#Service)
         + [method](#method)
     + [Context](#Context)
-        
- 
+
+
 
 ## 安装
 ```bash
@@ -115,6 +119,7 @@ remoteDubbo.ready().then(() => {
 * version `string` dubbo版本
 * application `string` 本地客户端名称
 * address `string` zookeeper服务地址
+* providerFilter `function` 筛选当前接口使用哪些provider服务，该选项用于根据服务参数定制使用的provider `默认为使用全部provider`
 * services `object` 声明使用的dubbo接口
 * services.remote.interface `string` dubbo公开接口
 * services.remote.version `string` dubbo接口版本
@@ -128,10 +133,23 @@ remoteDubbo.ready().then(() => {
 
 **示例**
 ```javascript
-const dubbo = new Consumer({
+const {Consumer} = require('dubbo4node')
+
+const BetaConsumer = Consumer.default({
+  // 筛选特定provider
+  providerFilter: (service, provider) => {
+    return provider.profile === 'beta'
+  },
+})
+
+const dubbo = new BetaConsumer({
   application: 'my_dubbo',
   version: '1.1.3',
   address: '127.0.0.1:2181',
+  // 覆盖默认参数
+  providerFilter: (service, provider) => {
+    return provider.profile === 'temp'
+  },
   services: {
     remote: {
       interface: 'com.remote.Remote',
@@ -426,7 +444,7 @@ const service = new Service({
 service.method('fun1', async (ctx, next) => {
   const {args} = ctx
   const [id] = args
-  
+
   await next() // 执行中间件
   ctx.result = id // 返回结果
 })
