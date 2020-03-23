@@ -96,7 +96,6 @@ class Consumer extends EventEmitter {
         provider.query.group === service.group &&
         provider.query.version === service.version &&
         provider.protocol === 'dubbo:' &&
-        provider.query.dubbo === service.dubboVersion &&
         (result === true || result === undefined)
       )
     })
