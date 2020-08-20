@@ -21,7 +21,7 @@ const RESPONSE_STATUS_CODE = Object.keys(RESPONSE_STATUS).map(k => RESPONSE_STAT
 const TYPE_RESPONSE = 0x2
 const TYPE_REQUEST = 0xc2
 
-const MAX_ID = 9223372036854775807
+const MAX_ID = 2147483646
 const MAX_LEN = 1024 * 1024 * 8
 
 const HEART_BEAT_CONSUMER = [
@@ -133,14 +133,14 @@ class Protocol {
   }
 
   getInvokeId () {
-    return this.data.readIntBE(4, 8)
+    return this.data.readInt32BE(4)
   }
 
   setInvokeId (id: number) {
     if (id > MAX_ID) {
       throw new Error(`invoke id > MAX_ID: ${MAX_ID}`)
     }
-    return this.data.writeIntBE(id, 4, 8)
+    return this.data.writeInt32BE(id, 4)
   }
 }
 
