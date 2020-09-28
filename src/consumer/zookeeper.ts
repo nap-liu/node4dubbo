@@ -139,7 +139,9 @@ class Zookeeper {
           }
         })
 
-        this.parent.providerReady(serviceName, service, outProviders)
+        if (type === 'providers') {
+          this.parent.providerReady(serviceName, service, outProviders)
+        }
       }
       this.subscribe(configuratorsPath, service, serviceName, nodeChange.bind(this, 'configs'))
     })
