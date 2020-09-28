@@ -138,10 +138,7 @@ class Zookeeper {
             query: Object.assign({}, provider.query, config && config.protocol === 'override:' && config.query)
           }
         })
-
-        if (type === 'providers') {
-          this.parent.providerReady(serviceName, service, outProviders)
-        }
+        this.parent.providerReady(serviceName, service, outProviders)
       }
       this.subscribe(configuratorsPath, service, serviceName, nodeChange.bind(this, 'configs'))
     })
