@@ -1,6 +1,6 @@
 {
   "name": "dubbo4node",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "description": "nodejs dubbo 模块",
   "main": "lib/index.js",
   "types": "typings/index.d.ts",
