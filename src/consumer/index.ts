@@ -86,7 +86,7 @@ class Consumer extends EventEmitter {
   }
 
   providerReady (serviceName: string, service: ServiceDefine, providers: UrlWithParsedQuery[]) {
-    debug('找到 provider', providers.map(item => `${item.hostname}:${item.port} ${item.query.interface}@${item.query.version} version: ${item.query.dubbo} profile: ${item.query.profile} env: ${item.query.environment}`).join('|'))
+    debug('发现 provider', providers.map(item => `${item.hostname}:${item.port} ${item.query.interface}@${item.query.version} version: ${item.query.dubbo} profile: ${item.query.profile} env: ${item.query.environment}`).join('|'))
     service.dubboVersion = this.option.version
     const {providerFilter = () => true} = this.option
 

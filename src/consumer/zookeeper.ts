@@ -65,7 +65,7 @@ class Zookeeper {
     switch (state) {
       case State.SYNC_CONNECTED:
         debug('zk已连接 开始获取zk节点')
-        this.getChildren()
+        this.loadProviders()
         break
       case State.CONNECTED_READ_ONLY:
         debug('zk连接到只读服务器 抛出错误')
@@ -106,42 +106,87 @@ class Zookeeper {
     }
   }
 
-  getChildren () {
+  loadProviders () {
     const {path, services} = this.option
     Object.keys(services).forEach(serviceName => {
       const service = services[serviceName]
       const {interface: _interface} = service
       const providerPath = `/${path}/${_interface}/providers`
-      this.client.getChildren(providerPath, this.getChildrenWatcher.bind(this, service, serviceName, providerPath), this.getChildrenCallback.bind(this, service, serviceName))
+      const configuratorsPath = `/${path}/${_interface}/configurators`
+
+      let providers: UrlWithParsedQuery[] = []
+      let configs: UrlWithParsedQuery[] = []
+
+      let initedConfig = false
+      const nodeChange = (type: string, list: string[]) => {
+        if (initedConfig === false) {
+          initedConfig = true
+          this.subscribe(providerPath, service, serviceName, nodeChange.bind(this, 'providers'))
+        }
+        const parsedList = this.parse(list)
+        debug('监听zk路径数据发生变化', type, parsedList.map(i => i.href))
+        if (type === 'providers') {
+          providers = parsedList
+        } else {
+          configs = parsedList
+        }
+
+        const outProviders = providers.map(provider => {
+          const config = configs.find(i => `${i.host}${i.pathname}` === `${provider.host}${provider.pathname}`)
+          return {
+            ...provider,
+            query: Object.assign({}, provider.query, config && config.protocol === 'override:' && config.query)
+          }
+        })
+
+        this.parent.providerReady(serviceName, service, outProviders)
+      }
+      this.subscribe(configuratorsPath, service, serviceName, nodeChange.bind(this, 'configs'))
     })
   }
 
-  getChildrenWatcher (service: Service, serviceName: string, path: string, event: Event) {
-    debug('zk watcher 服务节点改变')
-    this.emit('zookeeper-node-change', {
-      path,
-      service,
-      serviceName,
-      event
-    })
-    this.client.getChildren(path, this.getChildrenWatcher.bind(this, service, serviceName, path), this.getChildrenCallback.bind(this, service, serviceName))
-  }
+  subscribe (path: string, service: Service, serviceName: string, callback: (...args: any) => void) {
+    let disabled = false
 
-  getChildrenCallback (service: Service, serviceName: string, error: ClientError, children: string[]) {
-    if (error) {
-      this.emit('error', error, {
-        service,
-        serviceName
-      })
-      this.clear()
-      return
+    const watcherNodeChange = (event: Event) => {
+      if (disabled) {
+        debug('zk 已停止监听', path)
+        return
+      }
+      debug('zk 节点变更', path)
+      listener()
     }
-    this.children = this.parseProvider(children)
-    this.parent.providerReady(serviceName, service, this.children)
-    debug('zk 节点解析完毕')
+
+    const loadChildren = (error: ClientError, children: string[]) => {
+      if (disabled) {
+        debug('zk 已停止获取节点', path)
+        return
+      }
+      if (error) {
+        this.emit('error', error, {
+          service,
+          serviceName
+        })
+        return
+      }
+      callback(children)
+    }
+
+    const listener = () => {
+      if (disabled) {
+        return
+      }
+      this.client.getChildren(path, watcherNodeChange, loadChildren)
+    }
+
+    listener()
+
+    return () => {
+      disabled = true
+    }
   }
 
-  parseProvider (children: string[]): UrlWithParsedQuery[] {
+  parse (children: string[]): UrlWithParsedQuery[] {
     return children.map(service => {
       service = decodeURIComponent(service)
       return url.parse(service, true)
